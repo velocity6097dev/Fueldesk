@@ -1,0 +1,17 @@
+{
+  "name": "fueldesk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile-first billing + admin app for a fuel station, backed by Supabase.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "create-admin": "node scripts/create-first-admin.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2"
+  }
+}

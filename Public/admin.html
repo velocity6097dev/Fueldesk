@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FuelDesk — Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div class="app-header app-header--admin">
+        <div class="app-header-row">
+            <div>
+                <div class="title">Admin Control</div>
+                <div class="subtitle" id="whoami">&nbsp;</div>
+            </div>
+            <button class="logout-btn">Log Out</button>
+        </div>
+    </div>
+
+    <div class="app-content">
+
+        <!-- Station details -->
+        <div class="card">
+            <div class="card-title">Station Details</div>
+            <div class="input-group">
+                <label for="station-name">Station Name</label>
+                <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
+            </div>
+            <div class="input-group">
+                <label for="station-address">Address</label>
+                <input type="text" id="station-address" placeholder="Street, City">
+            </div>
+            <div class="flex-row">
+                <div class="input-group">
+                    <label for="station-phone">Phone</label>
+                    <input type="text" id="station-phone" placeholder="98XXXXXXXX">
+                </div>
+                <div class="input-group">
+                    <label for="station-gstin">GSTIN</label>
+                    <input type="text" id="station-gstin" placeholder="Optional">
+                </div>
+            </div>
+        </div>
+
+        <!-- Rates & density -->
+        <div class="card">
+            <div class="card-title">Daily Rates &amp; Density</div>
+
+            <div class="input-group">
+                <label>MS (Petrol)</label>
+                <div class="flex-row">
+                    <input type="number" id="ms-rate" step="0.01" placeholder="Rate ₹/L">
+                    <input type="number" id="ms-density" step="0.1" placeholder="Density kg/m³">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>HSD (Diesel)</label>
+                <div class="flex-row">
+                    <input type="number" id="hsd-rate" step="0.01" placeholder="Rate ₹/L">
+                    <input type="number" id="hsd-density" step="0.1" placeholder="Density kg/m³">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Premium</label>
+                <div class="flex-row">
+                    <input type="number" id="premium-rate" step="0.01" placeholder="Rate ₹/L">
+                    <input type="number" id="premium-density" step="0.1" placeholder="Density kg/m³">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="active-template">Receipt Template</label>
+                <select id="active-template"></select>
+            </div>
+
+            <button id="save-config-btn" class="btn btn-primary">Save Settings</button>
+            <div id="config-alert" class="alert alert-success">Settings saved.</div>
+            <div id="config-error" class="alert alert-danger"></div>
+        </div>
+
+        <!-- Staff management -->
+        <div class="card">
+            <div class="card-title">Add Staff</div>
+            <div class="input-group">
+                <label for="new-staff-username">Username</label>
+                <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
+            </div>
+            <div class="input-group">
+                <label for="new-staff-pin">Password / PIN</label>
+                <input type="password" id="new-staff-pin" placeholder="At least 6 characters">
+            </div>
+            <div class="input-group">
+                <label for="new-staff-role">Role</label>
+                <select id="new-staff-role">
+                    <option value="STATION_STAFF">Station Staff</option>
+                    <option value="ADMIN_STAFF">Admin Staff</option>
+                </select>
+            </div>
+            <button id="add-staff-btn" class="btn btn-success">Create Staff</button>
+            <div id="staff-alert" class="alert alert-success">Staff added.</div>
+            <div id="staff-error" class="alert alert-danger"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Current Staff</div>
+            <div id="staff-list">
+                <div class="loading-veil">Loading staff...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/supabaseClient.js"></script>
+    <script src="/js/authGuard.js"></script>
+    <script src="/templates/registry.js"></script>
+    <script src="/templates/bpclTokheim.js"></script>
+    <script src="/templates/ioclTokheim.js"></script>
+    <script src="/admin.js"></script>
+</body>
+</html>

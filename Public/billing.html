@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FuelDesk — Billing</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div class="app-header app-header--billing">
+        <div class="app-header-row">
+            <div>
+                <div class="title">Fast Billing</div>
+                <div class="subtitle" id="whoami">&nbsp;</div>
+            </div>
+            <button class="logout-btn">Log Out</button>
+        </div>
+    </div>
+    <div class="live-stats">
+        <span>RATE: ₹<span id="display-rate">--</span></span>
+        <span>DENSITY: <span id="display-density">--</span></span>
+    </div>
+
+    <div class="app-content">
+        <div class="input-group">
+            <label for="product-select">Product</label>
+            <select id="product-select">
+                <option value="MS">Petrol (MS)</option>
+                <option value="HSD">Diesel (HSD)</option>
+                <option value="PREMIUM">Premium</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <div class="input-group">
+                <label for="billing-mode">Mode</label>
+                <select id="billing-mode">
+                    <option value="VOLUME">By Volume (Liters)</option>
+                    <option value="AMOUNT">By Amount (₹)</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="input-value" id="input-value-label">Enter Volume (Liters)</label>
+                <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+            </div>
+
+            <div class="input-group">
+                <label for="time-mode">Timestamp</label>
+                <select id="time-mode">
+                    <option value="CURRENT">Current Time</option>
+                    <option value="BACKDATE">Backdated (Custom)</option>
+                </select>
+            </div>
+            <div class="input-group" id="custom-time-inputs" style="display:none;">
+                <label for="custom-datetime">Bill Date &amp; Time</label>
+                <input type="datetime-local" id="custom-datetime">
+            </div>
+
+            <div id="billing-alert" class="alert alert-danger"></div>
+        </div>
+    </div>
+
+    <div class="bottom-bar">
+        <button id="print-btn" class="btn btn-billing">Print Bill</button>
+    </div>
+
+    <!-- Populated at print time by the active template's render() -->
+    <div id="thermal-receipt"></div>
+
+    <script src="/env.js"></script>
+    <script src="/js/supabaseClient.js"></script>
+    <script src="/js/authGuard.js"></script>
+    <script src="/templates/registry.js"></script>
+    <script src="/templates/bpclTokheim.js"></script>
+    <script src="/templates/ioclTokheim.js"></script>
+    <script src="/billing.js"></script>
+</body>
+</html>

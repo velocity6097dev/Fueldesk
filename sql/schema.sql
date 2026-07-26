@@ -1,0 +1,155 @@
+-- =========================================================
+-- FuelDesk schema
+-- Run this in Supabase SQL editor on a fresh project.
+--
+-- If you're migrating from the old schema, drop the old
+-- tables first (this WILL delete existing data):
+--
+--   drop table if exists transactions;
+--   drop table if exists users;
+--   drop table if exists daily_config;
+-- =========================================================
+
+-- ---------------------------------------------------------
+-- 1. profiles
+--    One row per login, linked 1:1 to a Supabase Auth user.
+--    Created/deactivated only through the server's /api/staff
+--    routes (using the service role key) — never directly
+--    from the browser.
+-- ---------------------------------------------------------
+create table if not exists profiles (
+    id          uuid primary key references auth.users(id) on delete cascade,
+    username    varchar(50) unique not null,
+    role        varchar(20) not null check (role in ('ADMIN_STAFF', 'STATION_STAFF')),
+    is_active   boolean not null default true,
+    created_at  timestamptz not null default now()
+);
+
+-- Helper used inside RLS policies. SECURITY DEFINER so it can read
+-- profiles even though profiles' own RLS would otherwise block the check.
+create or replace function is_admin(uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1 from profiles
+        where id = uid and role = 'ADMIN_STAFF' and is_active = true
+    );
+$$;
+
+alter table profiles enable row level security;
+
+create policy "profiles: read own row"
+    on profiles for select
+    using (auth.uid() = id);
+
+create policy "profiles: admins read all rows"
+    on profiles for select
+    using (is_admin(auth.uid()));
+
+-- Intentionally no insert/update/delete policies for the "authenticated"
+-- role. Staff are created/deactivated only via the server's service-role
+-- key (server.js), which bypasses RLS entirely and double-checks the
+-- caller is an active admin first.
+
+-- ---------------------------------------------------------
+-- 2. daily_config
+--    Singleton row (id = 1) with per-product rate/density,
+--    receipt template, and printed station details.
+-- ---------------------------------------------------------
+create table if not exists daily_config (
+    id                int primary key default 1 check (id = 1),
+
+    station_name      varchar(100) not null default 'Your Service Station',
+    station_address   varchar(150) not null default '',
+    station_phone     varchar(30)  not null default '',
+    station_gstin     varchar(30)  not null default '',
+
+    ms_rate           numeric(10,2) not null default 108.97,
+    ms_density        numeric(6,1)  not null default 755.0,
+    hsd_rate          numeric(10,2) not null default 92.00,
+    hsd_density       numeric(6,1)  not null default 832.0,
+    premium_rate      numeric(10,2) not null default 112.00,
+    premium_density   numeric(6,1)  not null default 745.0,
+
+    active_template   varchar(50) not null default 'BPCL_TOKHEIM',
+    updated_at        timestamptz not null default now()
+);
+
+insert into daily_config (id) values (1)
+    on conflict (id) do nothing;
+
+alter table daily_config enable row level security;
+
+create policy "daily_config: any signed-in user can read"
+    on daily_config for select
+    using (auth.role() = 'authenticated');
+
+-- No write policies here on purpose: rate/density/template/station
+-- details are only ever updated through the server's PUT /api/config
+-- route, which checks the caller is an admin and then writes with the
+-- service role key. This stops a station-staff account (or anyone who
+-- opens dev tools) from changing prices directly through Supabase.
+
+-- ---------------------------------------------------------
+-- 3. transactions
+--    Receipt numbers are assigned server-side by Postgres
+--    (not by the browser's Math.random) so they can never collide.
+-- ---------------------------------------------------------
+create sequence if not exists receipt_seq start 1000;
+
+create table if not exists transactions (
+    id               bigserial primary key,
+    receipt_no       varchar(20) unique,
+
+    product          varchar(10) not null check (product in ('MS', 'HSD', 'PREMIUM')),
+    rate             numeric(10,2) not null,
+    density          numeric(6,1) not null,
+    volume           numeric(10,3) not null,
+    amount           numeric(10,2) not null,
+    preset_type      varchar(10) not null check (preset_type in ('VOLUME', 'AMOUNT')),
+
+    bill_datetime    timestamptz not null,
+    bill_date        varchar(20) not null,   -- cached "DD/MM/YY" for fast receipt reprints
+    bill_time        varchar(20) not null,   -- cached "HH:MM"
+    is_backdated     boolean not null default false,
+
+    attendant_id       uuid references profiles(id),
+    attendant_username varchar(50),
+
+    created_at       timestamptz not null default now()
+);
+
+create or replace function set_receipt_no()
+returns trigger
+language plpgsql
+as $$
+begin
+    if new.receipt_no is null then
+        new.receipt_no := 'G' || nextval('receipt_seq');
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_set_receipt_no on transactions;
+create trigger trg_set_receipt_no
+    before insert on transactions
+    for each row
+    execute function set_receipt_no();
+
+alter table transactions enable row level security;
+
+create policy "transactions: staff insert their own bills"
+    on transactions for insert
+    with check (attendant_id = auth.uid());
+
+create policy "transactions: staff read own, admins read all"
+    on transactions for select
+    using (attendant_id = auth.uid() or is_admin(auth.uid()));
+
+-- No update/delete policy: printed bills are immutable. If you need
+-- voids/refunds later, add a separate `voided` boolean + an admin-only
+-- update policy rather than allowing edits to historical rows.

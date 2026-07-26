@@ -1,0 +1,56 @@
+/* Vanilla Reset & Basic UI */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: sans-serif; background-color: #f4f4f9; color: #333; padding: 20px; }
+.container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+h1 { margin-bottom: 20px; font-size: 24px; }
+.form-group { margin-bottom: 15px; }
+label { display: block; font-weight: bold; margin-bottom: 5px; }
+input, select, button { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 4px; }
+button { background-color: #28a745; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; }
+button:hover { background-color: #218838; }
+.flex-row { display: flex; gap: 10px; margin-bottom: 15px; }
+
+/* -------------------------------------- */
+/* EXACT 58mm THERMAL RECEIPT CSS         */
+/* -------------------------------------- */
+
+/* Hide the receipt on screen by default */
+#thermal-receipt { display: none; }
+
+@media print {
+    /* Hide everything else when printing */
+    body > *:not(#thermal-receipt) { display: none !important; }
+    
+    @page { margin: 0; size: 58mm auto; }
+    
+    body { background-color: white; padding: 0; }
+
+    #thermal-receipt {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 58mm;
+        background-color: white;
+        color: black;
+        padding: 4px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-left { text-align: left; }
+    .font-bold { font-weight: bold; }
+    .uppercase { text-transform: uppercase; }
+    
+    .bpcl-logo-box { border: 1px solid black; padding: 4px; width: 90px; margin: 0 auto 4px auto; font-size: 10px; line-height: 1; }
+    
+    .grid-3-col { display: grid; grid-template-columns: 90px 10px 1fr; row-gap: 2px; }
+    .grid-tax { display: grid; grid-template-columns: 105px 10px 1fr; row-gap: 2px; font-size: 10px; }
+    .flex-between { display: flex; justify-content: space-between; margin-bottom: 2px; }
+    
+    .my-2 { margin-top: 8px; margin-bottom: 8px; }
+    .my-3 { margin-top: 12px; margin-bottom: 12px; }
+}
