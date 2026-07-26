@@ -6,6 +6,39 @@
     <title>FuelDesk — Billing</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* The receipt only exists to be printed — keep it off-screen otherwise */
+        #thermal-receipt {
+            display: none;
+        }
+
+        @media print {
+            /* Tells the browser the page is 58mm wide, continuous roll height.
+               Chrome/Edge will pre-select this as the default paper size once
+               your printer driver is chosen, so no manual size/margin editing. */
+            @page {
+                size: 58mm auto;
+                margin: 0;
+            }
+
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 58mm;
+            }
+
+            /* Hide the entire app UI, show only the receipt */
+            body > *:not(#thermal-receipt) {
+                display: none !important;
+            }
+
+            #thermal-receipt {
+                display: block !important;
+                width: 58mm;
+            }
+        }
+    </style>
 </head>
 <body>
 
@@ -18,6 +51,7 @@
             <button class="logout-btn">Log Out</button>
         </div>
     </div>
+    
     <div class="live-stats">
         <span>RATE: ₹<span id="display-rate">--</span></span>
         <span>DENSITY: <span id="display-density">--</span></span>
@@ -47,6 +81,12 @@
                 <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
             </div>
 
+            <!-- NEW: Vehicle Number Input -->
+            <div class="input-group">
+                <label for="vehicle-no">Vehicle Number (Optional)</label>
+                <input type="text" id="vehicle-no" placeholder="e.g. WB 02 AB 1234">
+            </div>
+
             <div class="input-group">
                 <label for="time-mode">Timestamp</label>
                 <select id="time-mode">
@@ -54,6 +94,7 @@
                     <option value="BACKDATE">Backdated (Custom)</option>
                 </select>
             </div>
+            
             <div class="input-group" id="custom-time-inputs" style="display:none;">
                 <label for="custom-datetime">Bill Date &amp; Time</label>
                 <input type="datetime-local" id="custom-datetime">
