@@ -6,106 +6,87 @@
     <title>FuelDesk — Billing</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <style>
-        /* The receipt only exists to be printed — keep it off-screen otherwise */
-        #thermal-receipt {
-            display: none;
-        }
-
-        @media print {
-            /* Tells the browser the page is 58mm wide, continuous roll height.
-               Chrome/Edge will pre-select this as the default paper size once
-               your printer driver is chosen, so no manual size/margin editing. */
-            @page {
-                size: 58mm auto;
-                margin: 0;
-            }
-
-            html, body {
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 58mm;
-            }
-
-            /* Hide the entire app UI, show only the receipt */
-            body > *:not(#thermal-receipt) {
-                display: none !important;
-            }
-
-            #thermal-receipt {
-                display: block !important;
-                width: 58mm;
-            }
-        }
-    </style>
 </head>
 <body>
 
-    <div class="app-header app-header--billing">
-        <div class="app-header-row">
-            <div>
-                <div class="title">Fast Billing</div>
-                <div class="subtitle" id="whoami">&nbsp;</div>
+    <div class="app-screen">
+        <div class="app-topbar">
+            <div class="topbar-text">
+                <strong>Fast Billing</strong>
+                <div class="topbar-sub" id="whoami">&nbsp;</div>
             </div>
-            <button class="logout-btn">Log Out</button>
-        </div>
-    </div>
-    
-    <div class="live-stats">
-        <span>RATE: ₹<span id="display-rate">--</span></span>
-        <span>DENSITY: <span id="display-density">--</span></span>
-    </div>
-
-    <div class="app-content">
-        <div class="input-group">
-            <label for="product-select">Product</label>
-            <select id="product-select">
-                <option value="MS">Petrol (MS)</option>
-                <option value="HSD">Diesel (HSD)</option>
-                <option value="PREMIUM">Premium</option>
-            </select>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="role-badge" id="role-badge"></span>
+                <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
+            </div>
         </div>
 
-        <div class="card">
-            <div class="input-group">
-                <label for="billing-mode">Mode</label>
-                <select id="billing-mode">
-                    <option value="VOLUME">By Volume (Liters)</option>
-                    <option value="AMOUNT">By Amount (₹)</option>
-                </select>
-            </div>
-
-            <div class="input-group">
-                <label for="input-value" id="input-value-label">Enter Volume (Liters)</label>
-                <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
-            </div>
-
-            <!-- NEW: Vehicle Number Input -->
-            <div class="input-group">
-                <label for="vehicle-no">Vehicle Number (Optional)</label>
-                <input type="text" id="vehicle-no" placeholder="e.g. WB 02 AB 1234">
-            </div>
-
-            <div class="input-group">
-                <label for="time-mode">Timestamp</label>
-                <select id="time-mode">
-                    <option value="CURRENT">Current Time</option>
-                    <option value="BACKDATE">Backdated (Custom)</option>
-                </select>
-            </div>
-            
-            <div class="input-group" id="custom-time-inputs" style="display:none;">
-                <label for="custom-datetime">Bill Date &amp; Time</label>
-                <input type="datetime-local" id="custom-datetime">
-            </div>
-
-            <div id="billing-alert" class="alert alert-danger"></div>
+        <div class="stat-bar">
+            <div class="stat-chip">RATE ₹<b id="display-rate">--</b></div>
+            <div class="stat-chip">DENSITY <b id="display-density">--</b></div>
         </div>
-    </div>
 
-    <div class="bottom-bar">
-        <button id="print-btn" class="btn btn-billing">Print Bill</button>
+        <div class="app-main">
+
+            <div class="settings-block">
+                <div class="block-title">Product &amp; Mode</div>
+
+                <div class="field">
+                    <span>Product</span>
+                    <button type="button" class="picker-btn" id="product-picker-btn">
+                        <span id="product-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+
+                <div class="field" style="margin-top:14px;">
+                    <span>Billing Mode</span>
+                    <button type="button" class="picker-btn" id="mode-picker-btn">
+                        <span id="mode-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+
+                <label class="field" style="margin-top:14px;">
+                    <span id="input-value-label">Enter Volume (Liters)</span>
+                    <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+                </label>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Customer Details</div>
+                <div class="block-sub">Optional — printed on the receipt if filled in.</div>
+
+                <label class="field">
+                    <span>Vehicle Number</span>
+                    <input type="text" id="vehicle-no" placeholder="e.g. MH12AB1234" autocapitalize="characters">
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Mobile Number</span>
+                    <input type="tel" id="mobile-no" inputmode="numeric" placeholder="10-digit mobile" maxlength="10">
+                </label>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Timestamp</div>
+
+                <div class="field">
+                    <span>Bill Time</span>
+                    <button type="button" class="picker-btn" id="time-mode-picker-btn">
+                        <span id="time-mode-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+
+                <label class="field" id="custom-time-inputs" style="display:none;margin-top:14px;">
+                    <span>Bill Date &amp; Time</span>
+                    <input type="datetime-local" id="custom-datetime">
+                </label>
+            </div>
+
+            <button type="button" id="print-btn" class="btn btn-primary btn-block" style="padding:15px;font-size:15.5px;">Print Bill</button>
+        </div>
     </div>
 
     <!-- Populated at print time by the active template's render() -->
@@ -114,6 +95,7 @@
     <script src="/env.js"></script>
     <script src="/js/supabaseClient.js"></script>
     <script src="/js/authGuard.js"></script>
+    <script src="/js/ui.js"></script>
     <script src="/templates/registry.js"></script>
     <script src="/templates/bpclTokheim.js"></script>
     <script src="/templates/ioclTokheim.js"></script>

@@ -9,28 +9,39 @@
 </head>
 <body>
 
-    <div class="login-wrap">
-        <div class="login-card">
-            <div class="login-logo">FD</div>
-            <div class="login-title">FuelDesk</div>
-            <div class="login-subtitle">Log in with the account your admin gave you</div>
+    <div class="auth-screen">
+        <div class="auth-card">
+            <div class="brand">
+                <div class="brand-mark" style="border-radius:10px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--font-display);font-weight:700;">FD</div>
+                <div>
+                    <h1>FuelDesk</h1>
+                    <p class="brand-sub">Log in with the account your admin gave you</p>
+                </div>
+            </div>
 
-            <form id="login-form">
-                <div class="input-group">
-                    <label for="username">Username</label>
+            <form id="authForm">
+                <label class="field">
+                    <span>Username</span>
                     <input type="text" id="username" autocomplete="username" placeholder="e.g. staff_rahul" autocapitalize="off" required>
-                </div>
-                <div class="input-group">
-                    <label for="password">Password / PIN</label>
-                    <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" id="login-btn" class="btn btn-primary">Log In</button>
-                <div id="login-alert" class="alert alert-danger"></div>
+                </label>
+
+                <label class="field">
+                    <span>Password / PIN</span>
+                    <div class="pw-wrap">
+                        <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required>
+                        <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </label>
+
+                <button type="submit" id="login-btn" class="btn btn-primary btn-block">Log In</button>
+                <p class="auth-msg" id="login-msg"></p>
             </form>
 
-            <div class="hint text-center mt-4">
+            <p class="auth-note text-center">
                 First time setting this up? Run <code>npm run create-admin</code> to create the first admin login.
-            </div>
+            </p>
         </div>
     </div>
 

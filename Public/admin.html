@@ -9,112 +9,150 @@
 </head>
 <body>
 
-    <div class="app-header app-header--admin">
-        <div class="app-header-row">
-            <div>
-                <div class="title">Admin Control</div>
-                <div class="subtitle" id="whoami">&nbsp;</div>
+    <div class="app-screen">
+        <div class="app-topbar">
+            <div class="topbar-text">
+                <strong>Admin Control</strong>
+                <div class="topbar-sub" id="whoami">&nbsp;</div>
             </div>
-            <button class="logout-btn">Log Out</button>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="role-badge">Admin</span>
+                <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
+            </div>
+        </div>
+
+        <div class="app-main">
+
+            <!-- Station details -->
+            <div class="settings-block">
+                <div class="block-title">Station Details</div>
+                <label class="field">
+                    <span>Station Name</span>
+                    <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
+                </label>
+                <label class="field" style="margin-top:14px;">
+                    <span>Address (one line per row — press Enter for a new line)</span>
+                    <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;State - PIN"></textarea>
+                </label>
+                <div class="settings-grid">
+                    <label class="field">
+                        <span>Phone</span>
+                        <input type="text" id="station-phone" placeholder="98XXXXXXXX">
+                    </label>
+                    <label class="field">
+                        <span>GSTIN</span>
+                        <input type="text" id="station-gstin" placeholder="Optional">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Receipt branding -->
+            <div class="settings-block">
+                <div class="block-title">Receipt Branding</div>
+
+                <div class="field">
+                    <span>Logo</span>
+                    <div class="photo-upload-row">
+                        <div class="photo-preview" id="logo-preview">No logo</div>
+                        <div class="photo-upload-actions">
+                            <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Upload Photo</button>
+                            <button type="button" class="btn-danger-text btn btn-sm" id="logo-remove-btn" style="display:none;">Remove Logo</button>
+                            <input type="file" id="logo-file-input" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="hint" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
+                </div>
+
+                <div class="field" style="margin-top:14px;">
+                    <span>Logo Size on Receipt</span>
+                    <div class="range-row">
+                        <input type="range" id="logo-width" min="15" max="50" step="1" value="32">
+                        <span class="range-value" id="logo-width-value">32mm</span>
+                    </div>
+                </div>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Receipt Footer (one line per row)</span>
+                    <textarea id="receipt-footer" rows="2" placeholder="Thank You! Please Visit Again.."></textarea>
+                </label>
+
+                <div class="field" style="margin-top:14px;">
+                    <span>Receipt Template</span>
+                    <button type="button" class="picker-btn" id="template-picker-btn">
+                        <span id="template-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+
+                <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
+            </div>
+
+            <!-- Rates & density -->
+            <div class="settings-block">
+                <div class="block-title">Daily Rates &amp; Density</div>
+
+                <div class="block-sub">MS (Petrol)</div>
+                <div class="settings-grid">
+                    <label class="field"><span>Rate ₹/L</span><input type="number" id="ms-rate" step="0.01"></label>
+                    <label class="field"><span>Density kg/m³</span><input type="number" id="ms-density" step="0.1"></label>
+                </div>
+
+                <div class="block-sub" style="margin-top:14px;">HSD (Diesel)</div>
+                <div class="settings-grid">
+                    <label class="field"><span>Rate ₹/L</span><input type="number" id="hsd-rate" step="0.01"></label>
+                    <label class="field"><span>Density kg/m³</span><input type="number" id="hsd-density" step="0.1"></label>
+                </div>
+
+                <div class="block-sub" style="margin-top:14px;">Premium</div>
+                <div class="settings-grid">
+                    <label class="field"><span>Rate ₹/L</span><input type="number" id="premium-rate" step="0.01"></label>
+                    <label class="field"><span>Density kg/m³</span><input type="number" id="premium-density" step="0.1"></label>
+                </div>
+
+                <div class="settings-actions">
+                    <button type="button" id="save-config-btn" class="btn btn-primary btn-block">Save Settings</button>
+                </div>
+            </div>
+
+            <!-- Add staff -->
+            <div class="settings-block">
+                <div class="block-title">Add Staff</div>
+                <label class="field">
+                    <span>Username</span>
+                    <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
+                </label>
+                <label class="field" style="margin-top:14px;">
+                    <span>Password / PIN</span>
+                    <input type="password" id="new-staff-pin" placeholder="At least 6 characters">
+                </label>
+                <div class="field" style="margin-top:14px;">
+                    <span>Role</span>
+                    <button type="button" class="picker-btn" id="role-picker-btn">
+                        <span id="role-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <button type="button" id="add-staff-btn" class="btn btn-success btn-block" style="margin-top:14px;">Create Staff</button>
+            </div>
+
+            <!-- Staff list -->
+            <div class="settings-block">
+                <div class="block-title">Current Staff</div>
+                <div class="manage-list" id="staff-list">
+                    <div class="loading-veil">Loading staff...</div>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <div class="app-content">
-
-        <!-- Station details -->
-        <div class="card">
-            <div class="card-title">Station Details</div>
-            <div class="input-group">
-                <label for="station-name">Station Name</label>
-                <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
-            </div>
-            <div class="input-group">
-                <label for="station-address">Address</label>
-                <input type="text" id="station-address" placeholder="Street, City">
-            </div>
-            <div class="flex-row">
-                <div class="input-group">
-                    <label for="station-phone">Phone</label>
-                    <input type="text" id="station-phone" placeholder="98XXXXXXXX">
-                </div>
-                <div class="input-group">
-                    <label for="station-gstin">GSTIN</label>
-                    <input type="text" id="station-gstin" placeholder="Optional">
-                </div>
-            </div>
-        </div>
-
-        <!-- Rates & density -->
-        <div class="card">
-            <div class="card-title">Daily Rates &amp; Density</div>
-
-            <div class="input-group">
-                <label>MS (Petrol)</label>
-                <div class="flex-row">
-                    <input type="number" id="ms-rate" step="0.01" placeholder="Rate ₹/L">
-                    <input type="number" id="ms-density" step="0.1" placeholder="Density kg/m³">
-                </div>
-            </div>
-            <div class="input-group">
-                <label>HSD (Diesel)</label>
-                <div class="flex-row">
-                    <input type="number" id="hsd-rate" step="0.01" placeholder="Rate ₹/L">
-                    <input type="number" id="hsd-density" step="0.1" placeholder="Density kg/m³">
-                </div>
-            </div>
-            <div class="input-group">
-                <label>Premium</label>
-                <div class="flex-row">
-                    <input type="number" id="premium-rate" step="0.01" placeholder="Rate ₹/L">
-                    <input type="number" id="premium-density" step="0.1" placeholder="Density kg/m³">
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label for="active-template">Receipt Template</label>
-                <select id="active-template"></select>
-            </div>
-
-            <button id="save-config-btn" class="btn btn-primary">Save Settings</button>
-            <div id="config-alert" class="alert alert-success">Settings saved.</div>
-            <div id="config-error" class="alert alert-danger"></div>
-        </div>
-
-        <!-- Staff management -->
-        <div class="card">
-            <div class="card-title">Add Staff</div>
-            <div class="input-group">
-                <label for="new-staff-username">Username</label>
-                <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
-            </div>
-            <div class="input-group">
-                <label for="new-staff-pin">Password / PIN</label>
-                <input type="password" id="new-staff-pin" placeholder="At least 6 characters">
-            </div>
-            <div class="input-group">
-                <label for="new-staff-role">Role</label>
-                <select id="new-staff-role">
-                    <option value="STATION_STAFF">Station Staff</option>
-                    <option value="ADMIN_STAFF">Admin Staff</option>
-                </select>
-            </div>
-            <button id="add-staff-btn" class="btn btn-success">Create Staff</button>
-            <div id="staff-alert" class="alert alert-success">Staff added.</div>
-            <div id="staff-error" class="alert alert-danger"></div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Current Staff</div>
-            <div id="staff-list">
-                <div class="loading-veil">Loading staff...</div>
-            </div>
-        </div>
-
-    </div>
+    <!-- Populated by the "Preview Receipt" button -->
+    <div id="thermal-receipt"></div>
 
     <script src="/env.js"></script>
     <script src="/js/supabaseClient.js"></script>
     <script src="/js/authGuard.js"></script>
+    <script src="/js/ui.js"></script>
     <script src="/templates/registry.js"></script>
     <script src="/templates/bpclTokheim.js"></script>
     <script src="/templates/ioclTokheim.js"></script>

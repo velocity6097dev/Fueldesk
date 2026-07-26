@@ -7,12 +7,21 @@
 // `render(data)` must return an HTML string for the #thermal-receipt div.
 // `data` shape (all fields already formatted as strings unless noted):
 //   {
-//     station:  { name, address, phone, gstin },
+//     station: { name, address, phone, gstin, logoUrl, logoWidthMm },
+//     footer,                          // printed at the bottom, may contain "\n"
 //     receiptNo, productLabel,
 //     density, presetTypeLabel, rate, volume, amount,
 //     dateStr, timeStr, printDateStr, printTimeStr,
-//     attendantUsername
+//     attendantUsername, vehicleNo, mobileNo
 //   }
+//
+// `station.address` and `footer` may contain literal "\n" line breaks
+// (typed into a <textarea> in the admin panel) — use the multiline()
+// helper below rather than dropping them straight into HTML.
+//
+// IMPORTANT: any station/user-supplied text (name, address, footer,
+// vehicle/mobile numbers) must go through escapeHtml() or multiline()
+// before being placed in the returned HTML — never interpolate it raw.
 
 window.BillTemplates = (function () {
     const templates = {};
@@ -33,5 +42,19 @@ window.BillTemplates = (function () {
         return Object.values(templates);
     }
 
-    return { register, get, list };
+    // Templates receive plain strings that may contain user-typed "\n"
+    // (from the address / footer textareas). These two helpers turn that
+    // into safe, correctly line-broken HTML for the printed receipt.
+    function escapeHtml(str) {
+        return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[c]));
+    }
+
+    function multiline(str, attrs = '') {
+        return escapeHtml(str).split('\n').filter((l) => l.trim() !== '')
+            .map((l) => `<div${attrs ? ` ${attrs}` : ''}>${l}</div>`).join('');
+    }
+
+    return { register, get, list, escapeHtml, multiline };
 })();

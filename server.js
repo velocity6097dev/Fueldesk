@@ -192,6 +192,7 @@ app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
 app.put('/api/config', requireAdmin, async (req, res) => {
     const allowedFields = [
         'station_name', 'station_address', 'station_phone', 'station_gstin',
+        'receipt_footer', 'logo_url', 'logo_width_mm',
         'ms_rate', 'ms_density',
         'hsd_rate', 'hsd_density',
         'premium_rate', 'premium_density',

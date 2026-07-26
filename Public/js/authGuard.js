@@ -8,7 +8,7 @@
 
 window.FuelDeskAuth = (function () {
     const HOME_BY_ROLE = {
-        ADMIN_STAFF: '/admin.html',
+        ADMIN_STAFF: '/home.html',
         STATION_STAFF: '/billing.html',
     };
 
@@ -66,5 +66,29 @@ window.FuelDeskAuth = (function () {
         });
     }
 
-    return { requireSession };
+    // Only admins get this — it's how they hop between the Billing and
+    // Admin panels without logging out. Station staff never see it,
+    // since they only ever have access to Billing.
+    function renderPanelSwitcher(activePage) {
+        if (!window.currentProfile || window.currentProfile.role !== 'ADMIN_STAFF') return;
+
+        const nav = document.createElement('div');
+        nav.className = 'bottom-nav';
+        nav.innerHTML = `
+            <button type="button" class="nav-btn${activePage === 'billing' ? ' active' : ''}" data-target="/billing.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z"/><path d="M9 7h6M9 11h6"/></svg>
+                <span>Billing</span>
+            </button>
+            <button type="button" class="nav-btn${activePage === 'admin' ? ' active' : ''}" data-target="/admin.html">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+                <span>Admin</span>
+            </button>
+        `;
+        nav.querySelectorAll('.nav-btn').forEach((btn) => {
+            btn.addEventListener('click', () => window.location.href = btn.dataset.target);
+        });
+        document.body.appendChild(nav);
+    }
+
+    return { requireSession, renderPanelSwitcher };
 })();

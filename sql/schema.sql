@@ -63,9 +63,21 @@ create table if not exists daily_config (
     id                int primary key default 1 check (id = 1),
 
     station_name      varchar(100) not null default 'Your Service Station',
-    station_address   varchar(150) not null default '',
+    -- `text` (not varchar) because the admin UI is a textarea: line breaks
+    -- typed there are stored as literal "\n" and reproduced on the receipt.
+    station_address   text         not null default '',
     station_phone     varchar(30)  not null default '',
     station_gstin     varchar(30)  not null default '',
+
+    -- Printed at the very bottom of every receipt. Also supports "\n" line
+    -- breaks. Defaults to the old hardcoded message so existing receipts
+    -- don't change until an admin edits it.
+    receipt_footer    text         not null default 'Thank You! Please Visit Again..',
+
+    -- Optional custom logo shown at the top of the receipt instead of the
+    -- plain text logo box. Uploaded to the "station-assets" storage bucket.
+    logo_url          text,
+    logo_width_mm     numeric(4,1) not null default 32.0 check (logo_width_mm between 15 and 50),
 
     ms_rate           numeric(10,2) not null default 108.97,
     ms_density        numeric(6,1)  not null default 755.0,
@@ -116,6 +128,9 @@ create table if not exists transactions (
     bill_time        varchar(20) not null,   -- cached "HH:MM"
     is_backdated     boolean not null default false,
 
+    vehicle_no       varchar(20),
+    mobile_no        varchar(15),
+
     attendant_id       uuid references profiles(id),
     attendant_username varchar(50),
 
@@ -153,3 +168,29 @@ create policy "transactions: staff read own, admins read all"
 -- No update/delete policy: printed bills are immutable. If you need
 -- voids/refunds later, add a separate `voided` boolean + an admin-only
 -- update policy rather than allowing edits to historical rows.
+
+-- ---------------------------------------------------------
+-- 4. Storage bucket for the receipt logo
+--    Public read (so it can be embedded as an <img> on the printed
+--    receipt without needing a signed URL); only admins can upload,
+--    replace, or remove the file.
+-- ---------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('station-assets', 'station-assets', true)
+on conflict (id) do nothing;
+
+create policy "station-assets: public read"
+    on storage.objects for select
+    using (bucket_id = 'station-assets');
+
+create policy "station-assets: admins upload"
+    on storage.objects for insert
+    with check (bucket_id = 'station-assets' and is_admin(auth.uid()));
+
+create policy "station-assets: admins update"
+    on storage.objects for update
+    using (bucket_id = 'station-assets' and is_admin(auth.uid()));
+
+create policy "station-assets: admins delete"
+    on storage.objects for delete
+    using (bucket_id = 'station-assets' and is_admin(auth.uid()));

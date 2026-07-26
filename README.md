@@ -12,6 +12,10 @@ a couple of things (Row Level Security) matter for security, not just style.
    - If you already have the old tables (`users`, `daily_config`,
      `transactions`) from the previous version, drop them first — the
      commented-out `drop table` lines at the top of the file do this.
+   - **Already running an earlier version of FuelDesk** (before logo/
+     footer/vehicle/mobile support existed)? Don't drop your tables —
+     run **`sql/migrations/002_photo_vehicle_mobile.sql`** instead. It's
+     safe to run even if some of it is already applied.
 3. In **Project Settings → API**, copy:
    - `Project URL` → `SUPABASE_URL`
    - `anon public` key → `SUPABASE_ANON_KEY`
@@ -103,6 +107,35 @@ whichever templates are registered — add a new pump brand by copying
 one of those files, changing the markup, and adding a `<script>` tag for
 it in `billing.html`/`admin.html`.
 
+**Admins can jump between panels without logging out.** After logging
+in, an admin lands on `/home.html` and picks "Billing Panel" or "Admin
+Panel". From inside either screen, a bottom nav bar lets them switch any
+time. Station staff never see this — they only ever have Billing.
+
+**Multi-line station address.** The address field in Admin is now a
+textarea — press Enter for a new line and it prints on its own line on
+the receipt, instead of being one long single-line string.
+
+**Custom receipt footer.** Admin can edit the message printed at the
+bottom of every receipt (defaults to the original "Thank You! Please
+Visit Again.."). It also supports multiple lines the same way the
+address does.
+
+**Custom, resizable logo.** Admin can upload a photo/logo (stored in a
+Supabase Storage bucket, `station-assets`) that replaces the plain text
+logo box at the top of the receipt, with a slider to size it for the
+58mm paper (15–50mm). Removing it falls back to the template's default
+text logo.
+
+**Vehicle & mobile number capture.** Billing now has optional "Vehicle
+Number" and "Mobile Number" fields, saved with the transaction and
+printed on the receipt (mobile is validated as 10 digits if entered).
+
+**"Preview Receipt" button** in Admin lets you check how the logo,
+footer, address, and chosen template will actually look on paper, using
+dummy numbers, without needing to save settings or bill a real
+transaction first.
+
 **Billing fixes:**
 - Receipt numbers are now assigned by a Postgres sequence
   (`sql/schema.sql`), not `Math.random()` — the old approach could
@@ -131,13 +164,16 @@ it in `billing.html`/`admin.html`.
 ```
 server.js              Express server: static files, /env.js, admin API
 scripts/create-first-admin.js
-sql/schema.sql          Tables + RLS policies
+sql/schema.sql                            Full schema (fresh installs)
+sql/migrations/002_photo_vehicle_mobile.sql   Incremental upgrade for existing installs
 public/
-  login.html / login.js
+  login.html / login.js     Universal login
+  home.html / home.js       Admin-only: choose Billing or Admin panel
   billing.html / billing.js
   admin.html / admin.js
-  css/style.css          Shared design tokens + components
-  js/supabaseClient.js   Builds the Supabase client from server-injected env
-  js/authGuard.js        Session + role check used by billing.html & admin.html
-  templates/              One file per receipt layout
+  css/style.css              Shared design tokens + components
+  js/supabaseClient.js       Builds the Supabase client from server-injected env
+  js/authGuard.js            Session + role check, admin panel-switcher nav
+  js/ui.js                   Toast messages + bottom-sheet picker (replaces <select>)
+  templates/                 One file per receipt layout
 ```
