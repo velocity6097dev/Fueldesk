@@ -12,20 +12,35 @@
 //       logoUrl, logoWidthMm, logoMarginTopMm, logoMarginBottomMm, logoAlign,
 //     },
 //     footer,                          // printed at the bottom, may contain "\n" + commands
-//     receiptNo, transactionId, fpId, nozzleNo, productLabel,
+//     receiptNo, transactionId, billDateTimeIso, fpId, nozzleNo, product, productLabel,
 //     density, presetTypeLabel, rate, volume, amount,
 //     dateStr, timeStr, printDateStr, printTimeStr,
 //     attendantUsername, vehicleNo, mobileNo
 //   }
 //
-// `station.address` and `footer` come straight from an admin's <textarea>
-// and may contain literal "\n" line breaks plus a tiny set of formatting
-// commands. Always render them with formattedBlock() below — never drop
-// them into HTML raw, and never build your own regex against them.
+// `billDateTimeIso` is the bill's timestamp as a full ISO string — use
+// this (via `new Date(data.billDateTimeIso)`) if a template needs a date
+// or time format other than the pre-formatted dateStr/timeStr (e.g. a
+// 4-digit year, or seconds).
 //
-// IMPORTANT: any other station/user-supplied text (name, vehicle/mobile
+// `station.address` and `footer` come straight from an admin's <textarea>
+// (and `station.name` from a text input) and may contain literal "\n"
+// line breaks plus a tiny set of formatting commands. Always render them
+// with formattedBlock(text, extraStyle, defaultAlign) below — never drop
+// them into HTML raw, and never build your own regex against them.
+// `extraStyle` is raw CSS declarations merged into the line's single
+// `style` attribute (e.g. `'font-size:10px;'`) — do NOT pass a full
+// `style="..."` string, since HTML silently drops a second `style`
+// attribute on the same tag. `defaultAlign` ('left' by default) lets a
+// template opt into e.g. "centered unless the admin overrides it".
+//
+// IMPORTANT: any other station/user-supplied text (vehicle/mobile
 // numbers, attendant name) must go through escapeHtml() before being
 // placed in the returned HTML.
+//
+// Each template file should wrap its contents in an IIFE (see
+// ioclGilbarco.js) if it declares any top-level const/function — every
+// template <script> shares one global scope on the page.
 
 window.BillTemplates = (function () {
     const templates = {};
@@ -68,8 +83,8 @@ window.BillTemplates = (function () {
         <p>Lines are left-aligned unless you wrap them in one of these.</p>
     `;
 
-    function formattedLine(rawLine, extraAttrs = '') {
-        let align = 'left';
+    function formattedLine(rawLine, extraStyle = '', defaultAlign = 'left') {
+        let align = defaultAlign;
         let body = rawLine;
 
         const centerMatch = body.match(/^<center>([\s\S]*)<\/center>$/i);
@@ -78,14 +93,16 @@ window.BillTemplates = (function () {
         else if (rightMatch) { align = 'right'; body = rightMatch[1]; }
 
         let html = escapeHtml(body).replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, '<b>$1</b>');
-        const attrs = `style="text-align:${align};"${extraAttrs ? ` ${extraAttrs}` : ''}`;
-        return `<div ${attrs}>${html}</div>`;
+        return `<div style="text-align:${align};${extraStyle}">${html}</div>`;
     }
 
-    function formattedBlock(text, extraAttrs = '') {
+    // extraStyle: raw CSS declarations merged into the line's single style
+    // attribute, e.g. formattedBlock(text, 'font-size:10px;'). Do NOT pass
+    // a full `style="..."` string here — just the declarations.
+    function formattedBlock(text, extraStyle = '', defaultAlign = 'left') {
         return String(text ?? '').split('\n')
             .filter((l) => l.trim() !== '')
-            .map((l) => formattedLine(l, extraAttrs))
+            .map((l) => formattedLine(l, extraStyle, defaultAlign))
             .join('');
     }
 

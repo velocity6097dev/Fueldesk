@@ -218,6 +218,7 @@ printBtn.addEventListener('click', async () => {
         footer: currentConfig.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: inserted.receipt_no,
         transactionId: String(inserted.id).padStart(16, '0'),
+        billDateTimeIso: billDateTime.toISOString(),
         fpId: currentConfig.fp_id || '1',
         nozzleNo: currentConfig.nozzle_no || '1',
         product,

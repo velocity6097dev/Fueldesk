@@ -108,24 +108,45 @@ Billing. Each protected page re-checks the session and role on load
   lock yourself out.
 
 **Bill templates are real, swappable files** in `public/templates/`
-(`bpclTokheim.js`, `ioclTokheim.js`, `ioclClassic.js`) instead of one
-hardcoded receipt layout. `ioclClassic.js` matches the exact field
-layout of a real dot-matrix pump receipt (Bill No, Trns.ID, Atnd.ID,
-Vehi.No, Date, Time, FP.ID, Nozl No, Fuel, Density, Preset, Rate, Sale,
-Volume, colon-aligned) — upload your real logo photo in Settings and it
-prints in the frame at the top instead of a placeholder. The Settings
-"Receipt Template" picker is generated from whichever templates are
-registered — add a new pump brand by copying one of those files,
-changing the markup, and adding a `<script>` tag for it in both
-`billing.html` and `admin.html` (after `registry.js`).
+(`bpclTokheim.js`, `ioclTokheim.js`, `ioclGilbarco.js`) instead of one
+hardcoded receipt layout. `ioclGilbarco.js` matches the exact field
+layout of a real dot-matrix pump receipt — Bill No, Trns.ID, Atnd.ID,
+Vehi.No, Date, Time, FP. ID, Nozl No, Fuel, Density, Preset, Rate, Sale,
+Volume, colon-aligned — with a few deliberate print-only touches to
+match a real printer's behavior: Bill No / Trns.ID / FP. ID / Nozl No
+are freshly randomized on every print (Bill No is 6 random digits +
+`-ORGNL`, Trns.ID is 16 digits with the last 9 random, FP. ID is
+randomly 1 or 2, Nozzle is randomly 1–4). **These are cosmetic only** —
+your real receipt number, database row id, and everything used for
+staff attribution/reporting elsewhere in the app are untouched; only
+what's printed on this specific template's paper varies. Text sizes for
+this template are a plain `TEXT_SIZES` constants block at the top of
+`ioclGilbarco.js` — edit that file directly to resize things; there's no
+Settings UI toggle for it by design. Upload your real logo photo in
+Settings and it prints in the frame at the top instead of a blank
+circle (no "IndianOil" text is hardcoded — the wordmark is expected to
+already be part of your uploaded photo). The Settings "Receipt Template"
+picker is generated from whichever templates are registered — add a new
+pump/brand combo by copying one of those files, changing the markup,
+and adding a `<script>` tag for it in both `billing.html` and
+`admin.html` (after `registry.js`). **If you add a template with its own
+top-level `const`/`function` declarations, wrap the file in an IIFE**
+(see `ioclGilbarco.js`) — every template `<script>` on the page shares
+one global scope, so un-wrapped same-named declarations across two
+template files will throw a syntax error.
 
-**Multi-line, formattable station address and receipt footer.** Both
-fields are left-aligned by default (press Enter for a new line). Wrap
-a line in `<center>...</center>` or `<right>...</right>` to align just
-that line, or `<b>...</b>` to bold part of it — tap the small **i**
-button next to either field for a reminder. These are the only three
-patterns recognized; everything else you type is shown literally and
-safely (there's no way to inject real HTML through these fields).
+**Multi-line, formattable station name, address, and receipt footer.**
+All three fields are left-aligned by default (press Enter for a new
+line). Wrap a line in `<center>...</center>` or `<right>...</right>` to
+align just that line, or `<b>...</b>` to bold part of it — tap the small
+**i** button next to any of the three fields for a reminder. These are
+the only three patterns recognized; everything else you type is shown
+literally and safely (there's no way to inject real HTML through these
+fields). Note: which template is active can still apply its own default
+— e.g. BPCL Tokheim / IOCL Tokheim center the station name unless you
+explicitly left/right-align a line, since that matches their branded
+look; `ioclGilbarco.js` leaves it left-aligned like everything else on
+that layout, matching a real printed receipt.
 
 **Custom, positionable logo.** Admin can upload a photo/logo (stored in
 a Supabase Storage bucket, `station-assets`) that replaces the plain
@@ -152,6 +173,12 @@ catching taps, so after opening a picker once, parts of the page could
 stop responding to touch. Fixed in `style.css` (the backdrop now has
 `pointer-events: none` while closed).
 
+**Fixed: font-size silently ignored on formatted address/footer lines.**
+The formatting helper was emitting two `style="..."` attributes on the
+same line (one for alignment, one for font-size) — HTML only honors the
+first one it sees, so the font-size was being silently dropped. Fixed
+by merging both into a single `style` attribute.
+
 **Billing fixes:**
 - Receipt numbers are now assigned by a Postgres sequence
   (`sql/schema.sql`), not `Math.random()` — the old approach could
@@ -168,8 +195,12 @@ stop responding to touch. Fixed in `style.css` (the backdrop now has
 
 ## Adding another receipt template
 
-1. Copy `public/templates/bpclTokheim.js` to e.g. `public/templates/myBrand.js`.
-2. Change `id`, `label`, and the HTML inside `render()`.
+1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
+   `public/templates/ioclGilbarco.js` (colon-aligned dot-matrix style) to
+   a new file, e.g. `public/templates/myBrand.js`.
+2. Change `id`, `label`, and the HTML inside `render()`. If your new
+   file declares any top-level `const`/`function`, wrap the whole thing
+   in an IIFE like `ioclGilbarco.js` does.
 3. Add `<script src="/templates/myBrand.js"></script>` in both
    `billing.html` and `admin.html`, after `registry.js`.
 4. It'll show up automatically in the Settings "Receipt Template" picker.

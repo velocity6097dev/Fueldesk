@@ -45,6 +45,7 @@ const templatePicker = makePickerField({
     initialValue: 'BPCL_TOKHEIM',
 });
 
+wireCommandsInfoButton(document.getElementById('name-info-btn'), 'Station Name');
 wireCommandsInfoButton(document.getElementById('address-info-btn'), 'Station Address');
 wireCommandsInfoButton(document.getElementById('footer-info-btn'), 'Receipt Footer');
 
@@ -259,6 +260,7 @@ previewReceiptBtn.addEventListener('click', () => {
         footer: receiptFooterInput.value || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: 'G0000',
         transactionId: '0000000000000001',
+        billDateTimeIso: new Date().toISOString(),
         fpId: fpIdInput.value.trim() || '1',
         nozzleNo: nozzleNoInput.value.trim() || '1',
         product: 'MS',
