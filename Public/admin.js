@@ -1,8 +1,4 @@
 const TEMPLATE_OPTIONS_FALLBACK = []; // populated from window.BillTemplates.list()
-const ROLE_OPTIONS = [
-    { value: 'STATION_STAFF', label: 'Station Staff' },
-    { value: 'ADMIN_STAFF', label: 'Admin Staff' },
-];
 
 const whoami = document.getElementById('whoami');
 
@@ -18,7 +14,16 @@ const logoRemoveBtn = document.getElementById('logo-remove-btn');
 const logoFileInput = document.getElementById('logo-file-input');
 const logoWidthSlider = document.getElementById('logo-width');
 const logoWidthValue = document.getElementById('logo-width-value');
+const logoMarginTopSlider = document.getElementById('logo-margin-top');
+const logoMarginTopValue = document.getElementById('logo-margin-top-value');
+const logoMarginBottomSlider = document.getElementById('logo-margin-bottom');
+const logoMarginBottomValue = document.getElementById('logo-margin-bottom-value');
+const logoAlignSegmented = document.getElementById('logo-align-segmented');
 const previewReceiptBtn = document.getElementById('preview-receipt-btn');
+
+const fpIdInput = document.getElementById('fp-id');
+const nozzleNoInput = document.getElementById('nozzle-no');
+const receiptWidthInput = document.getElementById('receipt-width');
 
 const msRateInput = document.getElementById('ms-rate');
 const msDensityInput = document.getElementById('ms-density');
@@ -29,12 +34,8 @@ const premiumDensityInput = document.getElementById('premium-density');
 
 const saveConfigBtn = document.getElementById('save-config-btn');
 
-const staffUsernameInput = document.getElementById('new-staff-username');
-const staffPinInput = document.getElementById('new-staff-pin');
-const addStaffBtn = document.getElementById('add-staff-btn');
-const staffListEl = document.getElementById('staff-list');
-
 let currentLogoUrl = null;
+let currentLogoAlign = 'CENTER';
 
 const templatePicker = makePickerField({
     buttonEl: document.getElementById('template-picker-btn'),
@@ -44,13 +45,10 @@ const templatePicker = makePickerField({
     initialValue: 'BPCL_TOKHEIM',
 });
 
-const rolePicker = makePickerField({
-    buttonEl: document.getElementById('role-picker-btn'),
-    labelEl: document.getElementById('role-picker-label'),
-    title: 'Staff Role',
-    options: ROLE_OPTIONS,
-    initialValue: 'STATION_STAFF',
-});
+wireCommandsInfoButton(document.getElementById('address-info-btn'), 'Station Address');
+wireCommandsInfoButton(document.getElementById('footer-info-btn'), 'Receipt Footer');
+
+document.getElementById('staff-nav-btn').addEventListener('click', () => window.location.href = '/staff.html');
 
 async function authHeaders() {
     const { data: { session } } = await window.sb.auth.getSession();
@@ -61,8 +59,8 @@ async function authHeaders() {
 }
 
 // Sends only the given fields — /api/config only touches keys present in
-// the body, so this is safe to call for a quick logo-only save without
-// clobbering the rest of daily_config.
+// the body, so this is safe to call for a quick partial save (e.g. just
+// the logo) without clobbering the rest of daily_config.
 async function patchConfig(fields) {
     const res = await fetch('/api/config', {
         method: 'PUT',
@@ -134,15 +132,36 @@ logoRemoveBtn.addEventListener('click', async () => {
     }
 });
 
-logoWidthSlider.addEventListener('input', () => {
-    logoWidthValue.textContent = `${logoWidthSlider.value}mm`;
+// Live-updating sliders that persist as soon as you let go (no need to
+// hit "Save Settings" just to see/keep a logo tweak).
+function wireLiveRange(slider, valueEl, unit, configKey) {
+    slider.addEventListener('input', () => { valueEl.textContent = `${slider.value}${unit}`; });
+    slider.addEventListener('change', async () => {
+        try {
+            await patchConfig({ [configKey]: Number(slider.value) });
+        } catch (err) {
+            Toast.show('Could not save: ' + err.message, { error: true });
+        }
+    });
+}
+wireLiveRange(logoWidthSlider, logoWidthValue, 'mm', 'logo_width_mm');
+wireLiveRange(logoMarginTopSlider, logoMarginTopValue, 'mm', 'logo_margin_top_mm');
+wireLiveRange(logoMarginBottomSlider, logoMarginBottomValue, 'mm', 'logo_margin_bottom_mm');
+
+logoAlignSegmented.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+        currentLogoAlign = btn.dataset.value;
+        logoAlignSegmented.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+        try {
+            await patchConfig({ logo_align: currentLogoAlign });
+        } catch (err) {
+            Toast.show('Could not save alignment: ' + err.message, { error: true });
+        }
+    });
 });
-logoWidthSlider.addEventListener('change', async () => {
-    try {
-        await patchConfig({ logo_width_mm: Number(logoWidthSlider.value) });
-    } catch (err) {
-        Toast.show('Could not save logo size: ' + err.message, { error: true });
-    }
+
+document.querySelectorAll('.chip-btn[data-cm]').forEach((btn) => {
+    btn.addEventListener('click', () => { receiptWidthInput.value = btn.dataset.cm; });
 });
 
 async function loadConfig() {
@@ -160,8 +179,20 @@ async function loadConfig() {
 
     currentLogoUrl = data.logo_url || null;
     renderLogoPreview(currentLogoUrl);
-    logoWidthSlider.value = data.logo_width_mm || 32;
+
+    logoWidthSlider.value = data.logo_width_mm ?? 32;
     logoWidthValue.textContent = `${logoWidthSlider.value}mm`;
+    logoMarginTopSlider.value = data.logo_margin_top_mm ?? 0;
+    logoMarginTopValue.textContent = `${logoMarginTopSlider.value}mm`;
+    logoMarginBottomSlider.value = data.logo_margin_bottom_mm ?? 4;
+    logoMarginBottomValue.textContent = `${logoMarginBottomSlider.value}mm`;
+
+    currentLogoAlign = data.logo_align || 'CENTER';
+    logoAlignSegmented.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.value === currentLogoAlign));
+
+    fpIdInput.value = data.fp_id || '1';
+    nozzleNoInput.value = data.nozzle_no || '1';
+    receiptWidthInput.value = data.receipt_width_cm ?? 5.8;
 
     msRateInput.value = data.ms_rate;
     msDensityInput.value = data.ms_density;
@@ -171,6 +202,8 @@ async function loadConfig() {
     premiumDensityInput.value = data.premium_density;
 
     templatePicker.set(data.active_template);
+
+    document.querySelectorAll('.settings-block').forEach((el) => el.classList.add('fade-in'));
 }
 
 saveConfigBtn.addEventListener('click', async () => {
@@ -180,11 +213,17 @@ saveConfigBtn.addEventListener('click', async () => {
     try {
         await patchConfig({
             station_name: stationNameInput.value.trim(),
-            station_address: stationAddressInput.value, // keep newlines as typed
+            station_address: stationAddressInput.value, // keep newlines/commands as typed
             station_phone: stationPhoneInput.value.trim(),
             station_gstin: stationGstinInput.value.trim(),
             receipt_footer: receiptFooterInput.value,
             logo_width_mm: Number(logoWidthSlider.value),
+            logo_margin_top_mm: Number(logoMarginTopSlider.value),
+            logo_margin_bottom_mm: Number(logoMarginBottomSlider.value),
+            logo_align: currentLogoAlign,
+            fp_id: fpIdInput.value.trim() || '1',
+            nozzle_no: nozzleNoInput.value.trim() || '1',
+            receipt_width_cm: parseFloat(receiptWidthInput.value) || 5.8,
             ms_rate: parseFloat(msRateInput.value),
             ms_density: parseFloat(msDensityInput.value),
             hsd_rate: parseFloat(hsdRateInput.value),
@@ -204,6 +243,7 @@ saveConfigBtn.addEventListener('click', async () => {
 
 previewReceiptBtn.addEventListener('click', () => {
     const template = window.BillTemplates.get(templatePicker.get());
+    applyReceiptWidth(parseFloat(receiptWidthInput.value) || 5.8);
     document.getElementById('thermal-receipt').innerHTML = template.render({
         station: {
             name: stationNameInput.value.trim() || 'Your Service Station',
@@ -212,9 +252,16 @@ previewReceiptBtn.addEventListener('click', () => {
             gstin: stationGstinInput.value.trim(),
             logoUrl: currentLogoUrl,
             logoWidthMm: Number(logoWidthSlider.value),
+            logoMarginTopMm: Number(logoMarginTopSlider.value),
+            logoMarginBottomMm: Number(logoMarginBottomSlider.value),
+            logoAlign: currentLogoAlign,
         },
-        footer: receiptFooterInput.value || 'Thank You! Please Visit Again..',
+        footer: receiptFooterInput.value || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: 'G0000',
+        transactionId: '0000000000000001',
+        fpId: fpIdInput.value.trim() || '1',
+        nozzleNo: nozzleNoInput.value.trim() || '1',
+        product: 'MS',
         productLabel: 'MS (Petrol)',
         density: msDensityInput.value || '755.0',
         presetTypeLabel: 'Volume',
@@ -232,122 +279,6 @@ previewReceiptBtn.addEventListener('click', () => {
     window.print();
 });
 
-function staffRowHtml(member, currentUserId) {
-    const roleTag = member.role === 'ADMIN_STAFF'
-        ? '<span class="tag tag-admin">Admin</span>'
-        : '<span class="tag tag-staff">Staff</span>';
-    const inactiveTag = member.is_active ? '' : '<span class="tag tag-inactive">Inactive</span>';
-    const isSelf = member.id === currentUserId;
-
-    return `
-        <div class="manage-item staff-item" data-id="${member.id}">
-            <div class="staff-main">
-                <div class="staff-name">${member.username}${roleTag}${inactiveTag}</div>
-                <div class="staff-meta">Added ${new Date(member.created_at).toLocaleDateString()}</div>
-            </div>
-            <div class="staff-actions">
-                ${isSelf ? '' : `
-                    <button type="button" class="btn btn-ghost btn-xs toggle-active-btn" data-active="${member.is_active}">
-                        ${member.is_active ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button type="button" class="btn btn-danger-text btn-xs delete-staff-btn">Delete</button>
-                `}
-            </div>
-        </div>
-    `;
-}
-
-async function loadStaff() {
-    staffListEl.innerHTML = '<div class="loading-veil">Loading staff...</div>';
-    try {
-        const res = await fetch('/api/staff', { headers: await authHeaders() });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Could not load staff');
-
-        if (!body.staff.length) {
-            staffListEl.innerHTML = '<div class="empty-state">No staff yet.</div>';
-            return;
-        }
-
-        staffListEl.innerHTML = body.staff.map((m) => staffRowHtml(m, window.currentSession.user.id)).join('');
-
-        staffListEl.querySelectorAll('.toggle-active-btn').forEach((btn) => {
-            btn.addEventListener('click', async (e) => {
-                const row = e.target.closest('.staff-item');
-                const isActive = e.target.dataset.active === 'true';
-                await updateStaff(row.dataset.id, { is_active: !isActive });
-            });
-        });
-        staffListEl.querySelectorAll('.delete-staff-btn').forEach((btn) => {
-            btn.addEventListener('click', async (e) => {
-                const row = e.target.closest('.staff-item');
-                if (!confirm('Permanently delete this staff account? This cannot be undone.')) return;
-                await deleteStaff(row.dataset.id);
-            });
-        });
-    } catch (err) {
-        staffListEl.innerHTML = `<div class="empty-state">${err.message}</div>`;
-    }
-}
-
-async function updateStaff(id, updates) {
-    try {
-        const res = await fetch(`/api/staff/${id}`, {
-            method: 'PATCH',
-            headers: await authHeaders(),
-            body: JSON.stringify(updates),
-        });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Update failed');
-        await loadStaff();
-    } catch (err) {
-        Toast.show(err.message, { error: true });
-    }
-}
-
-async function deleteStaff(id) {
-    try {
-        const res = await fetch(`/api/staff/${id}`, { method: 'DELETE', headers: await authHeaders() });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Delete failed');
-        await loadStaff();
-    } catch (err) {
-        Toast.show(err.message, { error: true });
-    }
-}
-
-addStaffBtn.addEventListener('click', async () => {
-    const username = staffUsernameInput.value.trim();
-    const password = staffPinInput.value;
-    const role = rolePicker.get();
-
-    if (!username) return Toast.show('Enter a username.', { error: true });
-    if (!password || password.length < 6) return Toast.show('Password/PIN must be at least 6 characters.', { error: true });
-
-    addStaffBtn.disabled = true;
-    addStaffBtn.textContent = 'Creating...';
-
-    try {
-        const res = await fetch('/api/staff', {
-            method: 'POST',
-            headers: await authHeaders(),
-            body: JSON.stringify({ username, password, role }),
-        });
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error || 'Could not create staff');
-
-        staffUsernameInput.value = '';
-        staffPinInput.value = '';
-        Toast.show(`${username} added.`);
-        await loadStaff();
-    } catch (err) {
-        Toast.show(err.message, { error: true, duration: 5000 });
-    } finally {
-        addStaffBtn.disabled = false;
-        addStaffBtn.textContent = 'Create Staff';
-    }
-});
-
 (async function init() {
     const profile = await FuelDeskAuth.requireSession('ADMIN_STAFF');
     if (!profile) return;
@@ -356,14 +287,9 @@ addStaffBtn.addEventListener('click', async () => {
 
     // The template picker was created with an empty option list (templates
     // register themselves as their <script> tags load); fill it in now.
-    templatePickerOptionsReady();
+    const options = window.BillTemplates.list().map((t) => ({ value: t.id, label: t.label }));
+    TEMPLATE_OPTIONS_FALLBACK.push(...options);
 
     FuelDeskAuth.renderPanelSwitcher('admin');
     await loadConfig();
-    await loadStaff();
 })();
-
-function templatePickerOptionsReady() {
-    const options = window.BillTemplates.list().map((t) => ({ value: t.id, label: t.label }));
-    TEMPLATE_OPTIONS_FALLBACK.push(...options);
-}

@@ -26,6 +26,72 @@ window.Toast = (function () {
     return { show };
 })();
 
+// Small "what can I type here" help popover — used by the (i) buttons
+// next to the Address and Receipt Footer fields in Admin.
+window.InfoTip = (function () {
+    let modal = null;
+
+    function ensure() {
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-card">
+                <div class="sheet-title" style="padding:0;"></div>
+                <div class="info-body"></div>
+                <button type="button" class="btn btn-primary btn-block info-close">Got it</button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        modal.querySelector('.info-close').addEventListener('click', close);
+        return modal;
+    }
+
+    function close() {
+        if (modal) modal.classList.add('hidden');
+    }
+
+    function show({ title, bodyHtml }) {
+        const node = ensure();
+        node.querySelector('.sheet-title').textContent = title || '';
+        node.querySelector('.info-body').innerHTML = bodyHtml || '';
+        node.classList.remove('hidden');
+    }
+
+    return { show, close };
+})();
+
+// Wires an (i) button to open InfoTip with the shared formatting-commands
+// help text (BillTemplates.COMMANDS_HELP_HTML), for the Address/Footer
+// fields that both support the same <center>/<right>/<b> commands.
+function wireCommandsInfoButton(buttonEl, fieldLabel) {
+    buttonEl.addEventListener('click', () => {
+        window.InfoTip.show({
+            title: `Formatting "${fieldLabel}"`,
+            bodyHtml: window.BillTemplates.COMMANDS_HELP_HTML,
+        });
+    });
+}
+
+// Injects/updates a <style> tag that sets the printed receipt's paper
+// width (in cm). Call this before window.print() so @page picks it up.
+// Falls back to the 58mm default in style.css if never called.
+function applyReceiptWidth(widthCm) {
+    const cm = Number(widthCm) || 5.8;
+    let styleEl = document.getElementById('receipt-width-style');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'receipt-width-style';
+        document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `
+        @media print {
+            @page { margin: 0; size: ${cm}cm auto; }
+            #thermal-receipt { width: ${cm}cm !important; }
+        }
+    `;
+}
 // Bottom-sheet picker: a mobile-friendly stand-in for <select>.
 //
 //   SheetPicker.open({

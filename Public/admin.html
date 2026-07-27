@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FuelDesk — Admin</title>
+    <title>FuelDesk — Settings</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -12,10 +12,13 @@
     <div class="app-screen">
         <div class="app-topbar">
             <div class="topbar-text">
-                <strong>Admin Control</strong>
+                <strong>Settings</strong>
                 <div class="topbar-sub" id="whoami">&nbsp;</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="topbar-icon-btn" id="staff-nav-btn" aria-label="Manage staff">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </button>
                 <span class="role-badge">Admin</span>
                 <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
             </div>
@@ -31,10 +34,14 @@
                     <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
                 </label>
                 <label class="field" style="margin-top:14px;">
-                    <span>Address (one line per row — press Enter for a new line)</span>
-                    <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;State - PIN"></textarea>
+                    <span class="field-label-row">
+                        Address
+                        <button type="button" class="info-btn" id="address-info-btn">i</button>
+                    </span>
+                    <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;<center>State - PIN</center>"></textarea>
                 </label>
-                <div class="settings-grid">
+                <div class="hint" style="margin-top:6px;">Left-aligned by default. Tap the <b>i</b> above for centering / bold commands.</div>
+                <div class="settings-grid" style="margin-top:14px;">
                     <label class="field">
                         <span>Phone</span>
                         <input type="text" id="station-phone" placeholder="98XXXXXXXX">
@@ -64,16 +71,44 @@
                 </div>
 
                 <div class="field" style="margin-top:14px;">
-                    <span>Logo Size on Receipt</span>
-                    <div class="range-row">
-                        <input type="range" id="logo-width" min="15" max="50" step="1" value="32">
-                        <span class="range-value" id="logo-width-value">32mm</span>
+                    <span>Logo Alignment</span>
+                    <div class="segmented" id="logo-align-segmented">
+                        <button type="button" data-value="LEFT">Left</button>
+                        <button type="button" data-value="CENTER" class="active">Center</button>
+                        <button type="button" data-value="RIGHT">Right</button>
                     </div>
                 </div>
 
+                <div class="settings-grid" style="margin-top:14px;">
+                    <label class="field">
+                        <span>Logo Width</span>
+                        <div class="range-row">
+                            <input type="range" id="logo-width" min="15" max="50" step="1" value="32">
+                            <span class="range-value" id="logo-width-value">32mm</span>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span>Space Above</span>
+                        <div class="range-row">
+                            <input type="range" id="logo-margin-top" min="0" max="30" step="1" value="0">
+                            <span class="range-value" id="logo-margin-top-value">0mm</span>
+                        </div>
+                    </label>
+                </div>
                 <label class="field" style="margin-top:14px;">
-                    <span>Receipt Footer (one line per row)</span>
-                    <textarea id="receipt-footer" rows="2" placeholder="Thank You! Please Visit Again.."></textarea>
+                    <span>Space Below</span>
+                    <div class="range-row">
+                        <input type="range" id="logo-margin-bottom" min="0" max="30" step="1" value="4">
+                        <span class="range-value" id="logo-margin-bottom-value">4mm</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span class="field-label-row">
+                        Receipt Footer
+                        <button type="button" class="info-btn" id="footer-info-btn">i</button>
+                    </span>
+                    <textarea id="receipt-footer" rows="2" placeholder="<center>Thank You! Please Visit Again..</center>"></textarea>
                 </label>
 
                 <div class="field" style="margin-top:14px;">
@@ -85,6 +120,31 @@
                 </div>
 
                 <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
+            </div>
+
+            <!-- Pump identifiers + paper size -->
+            <div class="settings-block">
+                <div class="block-title">Pump &amp; Paper Setup</div>
+                <div class="settings-grid">
+                    <label class="field">
+                        <span>FP / DU ID</span>
+                        <input type="text" id="fp-id" placeholder="1">
+                    </label>
+                    <label class="field">
+                        <span>Nozzle No.</span>
+                        <input type="text" id="nozzle-no" placeholder="1">
+                    </label>
+                </div>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Bill Width (cm)</span>
+                    <input type="number" id="receipt-width" step="0.1" min="4" max="12" placeholder="5.8">
+                </label>
+                <div class="chip-row">
+                    <button type="button" class="chip-btn" data-cm="5.8">58mm</button>
+                    <button type="button" class="chip-btn" data-cm="8.0">80mm</button>
+                </div>
+                <div class="hint" style="margin-top:8px;">Length is automatic based on content, like a real thermal paper roll — only width is fixed.</div>
             </div>
 
             <!-- Rates & density -->
@@ -114,35 +174,6 @@
                 </div>
             </div>
 
-            <!-- Add staff -->
-            <div class="settings-block">
-                <div class="block-title">Add Staff</div>
-                <label class="field">
-                    <span>Username</span>
-                    <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
-                </label>
-                <label class="field" style="margin-top:14px;">
-                    <span>Password / PIN</span>
-                    <input type="password" id="new-staff-pin" placeholder="At least 6 characters">
-                </label>
-                <div class="field" style="margin-top:14px;">
-                    <span>Role</span>
-                    <button type="button" class="picker-btn" id="role-picker-btn">
-                        <span id="role-picker-label"></span>
-                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
-                </div>
-                <button type="button" id="add-staff-btn" class="btn btn-success btn-block" style="margin-top:14px;">Create Staff</button>
-            </div>
-
-            <!-- Staff list -->
-            <div class="settings-block">
-                <div class="block-title">Current Staff</div>
-                <div class="manage-list" id="staff-list">
-                    <div class="loading-veil">Loading staff...</div>
-                </div>
-            </div>
-
         </div>
     </div>
 
@@ -156,6 +187,7 @@
     <script src="/templates/registry.js"></script>
     <script src="/templates/bpclTokheim.js"></script>
     <script src="/templates/ioclTokheim.js"></script>
+    <script src="/templates/ioclClassic.js"></script>
     <script src="/admin.js"></script>
 </body>
 </html>

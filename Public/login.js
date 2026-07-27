@@ -15,7 +15,7 @@ pwToggle.addEventListener('click', () => {
     pwToggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
 });
 
-const HOME_BY_ROLE = { ADMIN_STAFF: '/home.html', STATION_STAFF: '/billing.html' };
+const HOME_BY_ROLE = { ADMIN_STAFF: '/billing.html', STATION_STAFF: '/billing.html' };
 
 // If a message was passed in via ?msg=... (e.g. "session expired"), show it.
 const params = new URLSearchParams(window.location.search);

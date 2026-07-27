@@ -12,10 +12,14 @@ a couple of things (Row Level Security) matter for security, not just style.
    - If you already have the old tables (`users`, `daily_config`,
      `transactions`) from the previous version, drop them first — the
      commented-out `drop table` lines at the top of the file do this.
-   - **Already running an earlier version of FuelDesk** (before logo/
-     footer/vehicle/mobile support existed)? Don't drop your tables —
-     run **`sql/migrations/002_photo_vehicle_mobile.sql`** instead. It's
-     safe to run even if some of it is already applied.
+   - **Already running an earlier version of FuelDesk?** Don't drop your
+     tables — run the migration files in order instead:
+     - `sql/migrations/002_photo_vehicle_mobile.sql`
+     - `sql/migrations/003_logo_position_width_commands.sql`
+     Both are safe to run even if part of them is already applied. **If
+     your receipt footer wasn't showing up on printed bills**, that's
+     almost certainly because `002` (which adds the `receipt_footer`
+     column) hadn't been run yet — run it and it'll start appearing.
 3. In **Project Settings → API**, copy:
    - `Project URL` → `SUPABASE_URL`
    - `anon public` key → `SUPABASE_ANON_KEY`
@@ -39,8 +43,8 @@ npm run create-admin -- yourname yourpassword
 ```
 
 (password/PIN must be at least 6 characters). After this, log in at
-`/login.html` with that username/password and use the Admin screen to add
-everyone else — you won't need this script again.
+`/login.html` with that username/password and use the Staff page
+(top-bar icon) to add everyone else — you won't need this script again.
 
 ## 4. Run it
 
@@ -49,8 +53,9 @@ npm start
 ```
 
 - Login: `http://localhost:3000/login.html`
-- Everyone (admin and station staff) logs in at the same URL — the app
-  reads their role and sends them to the right screen automatically.
+- Everyone (admin and station staff) logs in at the same URL and lands
+  on the Billing screen. Admins additionally get a bottom nav to switch
+  to Settings, and a Staff icon in the top bar.
 
 ## What changed from your original files, and why
 
@@ -84,11 +89,12 @@ Since staff think in usernames, not emails, the app quietly turns
 `rahul` into `rahul@station.local` (configurable via `AUTH_EMAIL_DOMAIN`
 in `.env`) behind the scenes — staff only ever see "username" on screen.
 
-**One login screen, role-based redirect.** `/login.html` is shared by
-admin and station staff. After signing in, the app checks the person's
-role in `profiles` and sends them to `/admin.html` or `/billing.html`.
-Each of those pages re-checks the role on load (`public/js/authGuard.js`)
-and bounces anyone who doesn't belong there.
+**One login screen for everyone.** `/login.html` is shared by admin and
+station staff. After signing in, everyone lands on `/billing.html`.
+Admins get an extra bottom nav to reach `/admin.html` (Settings) and a
+Staff icon in the top bar for `/staff.html`; station staff only ever see
+Billing. Each protected page re-checks the session and role on load
+(`public/js/authGuard.js`) and bounces anyone who doesn't belong there.
 
 **Admin can now do everything asked for:**
 - Set price *and* density per product (MS, HSD, Premium — your schema
@@ -96,60 +102,69 @@ and bounces anyone who doesn't belong there.
   used).
 - Edit the printed station name/address/phone/GSTIN.
 - Add staff (this now actually creates a working login, not just a
-  database row).
+  database row) from a dedicated **Staff** page, reached via the icon
+  in the top bar — not buried inside Settings.
 - Deactivate or permanently delete staff, with a guard so you can't
   lock yourself out.
 
-**Bill templates are now real, swappable files** in `public/templates/`
-(`bpclTokheim.js`, `ioclTokheim.js`) instead of one hardcoded receipt
-layout. The admin's "Receipt Template" dropdown is generated from
-whichever templates are registered — add a new pump brand by copying
-one of those files, changing the markup, and adding a `<script>` tag for
-it in `billing.html`/`admin.html`.
+**Bill templates are real, swappable files** in `public/templates/`
+(`bpclTokheim.js`, `ioclTokheim.js`, `ioclClassic.js`) instead of one
+hardcoded receipt layout. `ioclClassic.js` matches the exact field
+layout of a real dot-matrix pump receipt (Bill No, Trns.ID, Atnd.ID,
+Vehi.No, Date, Time, FP.ID, Nozl No, Fuel, Density, Preset, Rate, Sale,
+Volume, colon-aligned) — upload your real logo photo in Settings and it
+prints in the frame at the top instead of a placeholder. The Settings
+"Receipt Template" picker is generated from whichever templates are
+registered — add a new pump brand by copying one of those files,
+changing the markup, and adding a `<script>` tag for it in both
+`billing.html` and `admin.html` (after `registry.js`).
 
-**Admins can jump between panels without logging out.** After logging
-in, an admin lands on `/home.html` and picks "Billing Panel" or "Admin
-Panel". From inside either screen, a bottom nav bar lets them switch any
-time. Station staff never see this — they only ever have Billing.
+**Multi-line, formattable station address and receipt footer.** Both
+fields are left-aligned by default (press Enter for a new line). Wrap
+a line in `<center>...</center>` or `<right>...</right>` to align just
+that line, or `<b>...</b>` to bold part of it — tap the small **i**
+button next to either field for a reminder. These are the only three
+patterns recognized; everything else you type is shown literally and
+safely (there's no way to inject real HTML through these fields).
 
-**Multi-line station address.** The address field in Admin is now a
-textarea — press Enter for a new line and it prints on its own line on
-the receipt, instead of being one long single-line string.
+**Custom, positionable logo.** Admin can upload a photo/logo (stored in
+a Supabase Storage bucket, `station-assets`) that replaces the plain
+text logo box at the top of the receipt. You control its width (15–50mm),
+left/center/right alignment, and the space above/below it — all with
+live sliders that save as soon as you let go, no need to hit "Save
+Settings" first. Removing the logo falls back to the template's default
+text placeholder.
 
-**Custom receipt footer.** Admin can edit the message printed at the
-bottom of every receipt (defaults to the original "Thank You! Please
-Visit Again.."). It also supports multiple lines the same way the
-address does.
+**Configurable receipt width.** "Bill Width (cm)" in Settings (with
+58mm/80mm quick-select chips) controls the actual printed paper width —
+applied dynamically right before printing. Height is always automatic,
+the same as a real thermal roll.
 
-**Custom, resizable logo.** Admin can upload a photo/logo (stored in a
-Supabase Storage bucket, `station-assets`) that replaces the plain text
-logo box at the top of the receipt, with a slider to size it for the
-58mm paper (15–50mm). Removing it falls back to the template's default
-text logo.
-
-**Vehicle & mobile number capture.** Billing now has optional "Vehicle
-Number" and "Mobile Number" fields, saved with the transaction and
-printed on the receipt (mobile is validated as 10 digits if entered).
-
-**"Preview Receipt" button** in Admin lets you check how the logo,
+**"Preview Receipt" button** in Settings lets you check how the logo,
 footer, address, and chosen template will actually look on paper, using
 dummy numbers, without needing to save settings or bill a real
 transaction first.
+
+**Fixed: pickers/dropdowns going "stuck".** The bottom-sheet picker
+(used for Product, Mode, Template, Role, etc.) had a CSS bug — when
+closed, its full-screen backdrop was invisible but still capable of
+catching taps, so after opening a picker once, parts of the page could
+stop responding to touch. Fixed in `style.css` (the backdrop now has
+`pointer-events: none` while closed).
 
 **Billing fixes:**
 - Receipt numbers are now assigned by a Postgres sequence
   (`sql/schema.sql`), not `Math.random()` — the old approach could
   silently collide and fail to save a bill.
 - The backdate fields were two free-text boxes ("DD/MM/YY", "HH:MM")
-  with no validation; that's now a single `datetime-local` picker.
-  This also fixed the underlying bug where the printed receipt could
-  disagree with what was actually saved, since both now come from one
-  parsed `Date`.
-  the same source.
+  with no validation; that's now a single `datetime-local` picker, so
+  the printed receipt and the saved row always agree.
 - Every bill records which attendant created it (`attendant_id`,
   `attendant_username`) for accountability.
 - Product selection (Petrol/Diesel/Premium) actually exists now, using
   the rate/density that matches what was sold.
+- Vehicle & mobile number fields, saved with the transaction and
+  printed on the receipt (mobile is validated as 10 digits if entered).
 
 ## Adding another receipt template
 
@@ -157,23 +172,24 @@ transaction first.
 2. Change `id`, `label`, and the HTML inside `render()`.
 3. Add `<script src="/templates/myBrand.js"></script>` in both
    `billing.html` and `admin.html`, after `registry.js`.
-4. It'll show up automatically in the admin's "Receipt Template" dropdown.
+4. It'll show up automatically in the Settings "Receipt Template" picker.
 
 ## Project structure
 
 ```
 server.js              Express server: static files, /env.js, admin API
 scripts/create-first-admin.js
-sql/schema.sql                            Full schema (fresh installs)
-sql/migrations/002_photo_vehicle_mobile.sql   Incremental upgrade for existing installs
+sql/schema.sql                                    Full schema (fresh installs)
+sql/migrations/002_photo_vehicle_mobile.sql       Incremental: logo/footer/vehicle/mobile
+sql/migrations/003_logo_position_width_commands.sql   Incremental: logo position, width, commands
 public/
   login.html / login.js     Universal login
-  home.html / home.js       Admin-only: choose Billing or Admin panel
-  billing.html / billing.js
-  admin.html / admin.js
+  billing.html / billing.js Lands here after login (everyone)
+  admin.html / admin.js     "Settings" — rates, branding, receipt setup (admin only)
+  staff.html / staff.js     Add/deactivate/delete staff (admin only)
   css/style.css              Shared design tokens + components
   js/supabaseClient.js       Builds the Supabase client from server-injected env
-  js/authGuard.js            Session + role check, admin panel-switcher nav
-  js/ui.js                   Toast messages + bottom-sheet picker (replaces <select>)
+  js/authGuard.js            Session + role check, Billing/Settings switcher nav
+  js/ui.js                   Toast, bottom-sheet picker, info popover, print-width helper
   templates/                 One file per receipt layout
 ```

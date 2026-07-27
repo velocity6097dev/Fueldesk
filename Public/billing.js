@@ -89,13 +89,38 @@ function defaultDatetimeLocalValue() {
     return d.toISOString().slice(0, 16);
 }
 
+const CONFIG_CACHE_KEY = 'fueldesk:dailyConfig';
+
+function readCachedConfig() {
+    try {
+        const raw = sessionStorage.getItem(CONFIG_CACHE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCachedConfig(data) {
+    try { sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(data)); } catch { /* ignore quota errors */ }
+}
+
 async function loadConfig() {
+    // Show a cached value instantly (if we have one from earlier this
+    // session) so the rate/density aren't blank while the network call
+    // is in flight, then quietly refresh with the real thing.
+    const cached = readCachedConfig();
+    if (cached) {
+        currentConfig = cached;
+        updateLiveStats();
+    }
+
     const { data, error } = await window.sb.from('daily_config').select('*').eq('id', 1).single();
     if (error || !data) {
-        Toast.show('Could not load current rates. Pull to refresh or contact an admin.', { error: true });
+        if (!cached) Toast.show('Could not load current rates. Pull to refresh or contact an admin.', { error: true });
         return;
     }
     currentConfig = data;
+    writeCachedConfig(data);
     updateLiveStats();
 }
 
@@ -186,9 +211,16 @@ printBtn.addEventListener('click', async () => {
             gstin: currentConfig.station_gstin,
             logoUrl: currentConfig.logo_url,
             logoWidthMm: currentConfig.logo_width_mm,
+            logoMarginTopMm: currentConfig.logo_margin_top_mm,
+            logoMarginBottomMm: currentConfig.logo_margin_bottom_mm,
+            logoAlign: currentConfig.logo_align,
         },
-        footer: currentConfig.receipt_footer,
+        footer: currentConfig.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: inserted.receipt_no,
+        transactionId: String(inserted.id).padStart(16, '0'),
+        fpId: currentConfig.fp_id || '1',
+        nozzleNo: currentConfig.nozzle_no || '1',
+        product,
         productLabel: PRODUCT_LABELS[product] || product,
         density: density,
         presetTypeLabel: mode === 'VOLUME' ? 'Volume' : 'Amount',
@@ -204,6 +236,7 @@ printBtn.addEventListener('click', async () => {
         mobileNo,
     });
 
+    applyReceiptWidth(currentConfig.receipt_width_cm);
     window.print();
 
     inputValue.value = '';
@@ -219,5 +252,12 @@ printBtn.addEventListener('click', async () => {
     roleBadge.textContent = profile.role === 'ADMIN_STAFF' ? 'Admin' : 'Staff';
     updateInputLabel();
     FuelDeskAuth.renderPanelSwitcher('billing');
+
+    if (profile.role === 'ADMIN_STAFF') {
+        const staffBtn = document.getElementById('staff-nav-btn');
+        staffBtn.style.display = 'flex';
+        staffBtn.addEventListener('click', () => window.location.href = '/staff.html');
+    }
+
     await loadConfig();
 })();

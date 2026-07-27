@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FuelDesk — Staff</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div class="app-screen">
+        <div class="app-topbar">
+            <div class="topbar-text" style="display:flex;align-items:center;gap:10px;">
+                <button type="button" class="topbar-icon-btn" id="back-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div>
+                    <strong>Staff</strong>
+                    <div class="topbar-sub" id="whoami">&nbsp;</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
+            </div>
+        </div>
+
+        <div class="app-main">
+
+            <div class="settings-block">
+                <div class="block-title">Add Staff</div>
+                <label class="field">
+                    <span>Username</span>
+                    <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
+                </label>
+                <label class="field" style="margin-top:14px;">
+                    <span>Password / PIN</span>
+                    <input type="password" id="new-staff-pin" placeholder="At least 6 characters">
+                </label>
+                <div class="field" style="margin-top:14px;">
+                    <span>Role</span>
+                    <button type="button" class="picker-btn" id="role-picker-btn">
+                        <span id="role-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <button type="button" id="add-staff-btn" class="btn btn-success btn-block" style="margin-top:14px;">Create Staff</button>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Current Staff</div>
+                <div class="manage-list" id="staff-list">
+                    <div class="skel-row"><div class="skel skel-line w-60"></div></div>
+                    <div class="skel-row"><div class="skel skel-line w-40"></div></div>
+                    <div class="skel-row"><div class="skel skel-line w-80"></div></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/supabaseClient.js"></script>
+    <script src="/js/authGuard.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/staff.js"></script>
+</body>
+</html>
