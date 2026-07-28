@@ -16,7 +16,8 @@ a couple of things (Row Level Security) matter for security, not just style.
      tables — run the migration files in order instead:
      - `sql/migrations/002_photo_vehicle_mobile.sql`
      - `sql/migrations/003_logo_position_width_commands.sql`
-     Both are safe to run even if part of them is already applied. **If
+     - `sql/migrations/004_format_panel.sql`
+     All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
      column) hadn't been run yet — run it and it'll start appearing.
@@ -193,6 +194,51 @@ by merging both into a single `style` attribute.
 - Vehicle & mobile number fields, saved with the transaction and
   printed on the receipt (mobile is validated as 10 digits if entered).
 
+## Latest round of fixes
+
+**Logo centering, made robust.** The logo now centers two ways at once
+— `text-align` on a wrapper explicitly forced to 100% width, *and*
+`margin: 0 auto` block-centering on the image itself. Some simple
+HTML-to-thermal-printer converters only honor one of these; using both
+guarantees the logo is actually centered across the paper's breadth
+regardless of renderer, for all three alignment options (left/center/
+right).
+
+**You never need to manually clear your cache after an update.**
+`server.js` now sends `Cache-Control: no-cache` on every static file —
+the browser still keeps a local copy for speed, but is required to
+check back with the server every time via ETag before using it. If a
+file changed, it gets the new one automatically; if not, the server
+just replies 304 and the old copy is reused. `/env.js` is sent with
+`no-store` (never cached at all) since it's cheap to regenerate and
+should always be current.
+
+**Remember Me at login.** Checked by default. When checked, your
+session is stored in `localStorage` and survives closing the browser/
+app. Unchecked, it goes to `sessionStorage` instead and disappears when
+the tab or browser closes — useful on a shared device where you don't
+want the next person automatically logged in as you.
+
+**New: Format panel** (`/format.html`, reached via "Adjust Margins &
+Spacing (Live)" in Settings) — a live, on-screen preview of the actual
+receipt (not a print dialog) that updates instantly as you drag:
+- **Side Margin** — left/right space, in mm (default 3mm).
+- **Space Before Content Starts** — top margin, in mm.
+- **Line Spacing** — a line-height multiplier.
+- **Base Text Size** — overall receipt font size, in px.
+
+These apply globally on top of *whichever* template is active — they're
+not a per-template setting. (Per-template field sizing, like the exact
+size of the "Bill No" line on the Gilbarco layout, is still a
+`TEXT_SIZES` block in that template's own file, by design — see below.)
+Switch templates right there in the panel to preview each one with your
+real station name, address, and logo before committing. Nothing is
+saved until you tap "Save."
+
+**Branding.** "Made by Velocity.logs" appears at the bottom of every
+screen in the app (login, Billing, Settings, Staff, Format) — never on
+the printed receipt itself.
+
 ## Adding another receipt template
 
 1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
@@ -203,23 +249,26 @@ by merging both into a single `style` attribute.
    in an IIFE like `ioclGilbarco.js` does.
 3. Add `<script src="/templates/myBrand.js"></script>` in both
    `billing.html` and `admin.html`, after `registry.js`.
-4. It'll show up automatically in the Settings "Receipt Template" picker.
+4. It'll show up automatically in the Settings "Receipt Template" picker
+   and in the Format panel's template picker.
 
 ## Project structure
 
 ```
-server.js              Express server: static files, /env.js, admin API
+server.js              Express server: static files, /env.js, admin API, no-cache headers
 scripts/create-first-admin.js
-sql/schema.sql                                    Full schema (fresh installs)
-sql/migrations/002_photo_vehicle_mobile.sql       Incremental: logo/footer/vehicle/mobile
+sql/schema.sql                                        Full schema (fresh installs)
+sql/migrations/002_photo_vehicle_mobile.sql           Incremental: logo/footer/vehicle/mobile
 sql/migrations/003_logo_position_width_commands.sql   Incremental: logo position, width, commands
+sql/migrations/004_format_panel.sql                   Incremental: global margin/spacing/font size
 public/
-  login.html / login.js     Universal login
+  login.html / login.js     Universal login, Remember Me
   billing.html / billing.js Lands here after login (everyone)
   admin.html / admin.js     "Settings" — rates, branding, receipt setup (admin only)
   staff.html / staff.js     Add/deactivate/delete staff (admin only)
+  format.html / format.js   Live margin/spacing/font-size editor (admin only)
   css/style.css              Shared design tokens + components
-  js/supabaseClient.js       Builds the Supabase client from server-injected env
+  js/supabaseClient.js       Builds the Supabase client, Remember Me storage adapter
   js/authGuard.js            Session + role check, Billing/Settings switcher nav
   js/ui.js                   Toast, bottom-sheet picker, info popover, print-width helper
   templates/                 One file per receipt layout

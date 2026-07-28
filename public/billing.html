@@ -89,11 +89,12 @@
             </div>
 
             <button type="button" id="print-btn" class="btn btn-primary btn-block" style="padding:15px;font-size:15.5px;">Print Bill</button>
+            <div class="app-footer-brand">Made by Velocity.logs</div>
         </div>
     </div>
 
     <!-- Populated at print time by the active template's render() -->
-    <div id="thermal-receipt"></div>
+    <div id="thermal-receipt" class="print-only"></div>
 
     <script src="/env.js"></script>
     <script src="/js/supabaseClient.js"></script>

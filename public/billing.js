@@ -203,7 +203,7 @@ printBtn.addEventListener('click', async () => {
     const printedAt = formatDateTime(now);
 
     const template = window.BillTemplates.get(currentConfig.active_template);
-    document.getElementById('thermal-receipt').innerHTML = template.render({
+    const rendered = template.render({
         station: {
             name: currentConfig.station_name,
             address: currentConfig.station_address,
@@ -235,6 +235,13 @@ printBtn.addEventListener('click', async () => {
         attendantUsername: window.currentProfile.username,
         vehicleNo: vehicleNoInput.value.trim().toUpperCase(),
         mobileNo,
+    });
+
+    document.getElementById('thermal-receipt').innerHTML = window.BillTemplates.wrapForOutput(rendered, {
+        marginMm: currentConfig.receipt_margin_mm,
+        marginTopMm: currentConfig.receipt_margin_top_mm,
+        lineSpacing: currentConfig.receipt_line_spacing,
+        baseFontPx: currentConfig.receipt_base_font_px,
     });
 
     applyReceiptWidth(currentConfig.receipt_width_cm);

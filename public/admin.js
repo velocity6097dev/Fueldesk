@@ -36,6 +36,7 @@ const saveConfigBtn = document.getElementById('save-config-btn');
 
 let currentLogoUrl = null;
 let currentLogoAlign = 'CENTER';
+let currentConfig = null;
 
 const templatePicker = makePickerField({
     buttonEl: document.getElementById('template-picker-btn'),
@@ -50,6 +51,7 @@ wireCommandsInfoButton(document.getElementById('address-info-btn'), 'Station Add
 wireCommandsInfoButton(document.getElementById('footer-info-btn'), 'Receipt Footer');
 
 document.getElementById('staff-nav-btn').addEventListener('click', () => window.location.href = '/staff.html');
+document.getElementById('format-panel-btn').addEventListener('click', () => window.location.href = '/format.html');
 
 async function authHeaders() {
     const { data: { session } } = await window.sb.auth.getSession();
@@ -171,6 +173,7 @@ async function loadConfig() {
         Toast.show('Could not load settings.', { error: true, duration: 5000 });
         return;
     }
+    currentConfig = data;
 
     stationNameInput.value = data.station_name || '';
     stationAddressInput.value = data.station_address || '';
@@ -245,7 +248,7 @@ saveConfigBtn.addEventListener('click', async () => {
 previewReceiptBtn.addEventListener('click', () => {
     const template = window.BillTemplates.get(templatePicker.get());
     applyReceiptWidth(parseFloat(receiptWidthInput.value) || 5.8);
-    document.getElementById('thermal-receipt').innerHTML = template.render({
+    const rendered = template.render({
         station: {
             name: stationNameInput.value.trim() || 'Your Service Station',
             address: stationAddressInput.value,
@@ -277,6 +280,13 @@ previewReceiptBtn.addEventListener('click', () => {
         attendantUsername: window.currentProfile.username,
         vehicleNo: 'MH12AB1234',
         mobileNo: '9876543210',
+    });
+
+    document.getElementById('thermal-receipt').innerHTML = window.BillTemplates.wrapForOutput(rendered, {
+        marginMm: currentConfig?.receipt_margin_mm,
+        marginTopMm: currentConfig?.receipt_margin_top_mm,
+        lineSpacing: currentConfig?.receipt_line_spacing,
+        baseFontPx: currentConfig?.receipt_base_font_px,
     });
     window.print();
 });

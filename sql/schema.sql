@@ -93,6 +93,15 @@ create table if not exists daily_config (
     -- real thermal roll — only width is fixed.
     receipt_width_cm   numeric(4,1) not null default 5.8 check (receipt_width_cm between 4 and 12),
 
+    -- Global formatting, editable live with a preview in the Format
+    -- panel. Applied as a wrapper around whichever template is active
+    -- (see BillTemplates.wrapForOutput in registry.js) — these are NOT
+    -- template-specific, they apply no matter which template you pick.
+    receipt_margin_mm     numeric(4,1) not null default 3.0 check (receipt_margin_mm between 0 and 15),
+    receipt_margin_top_mm numeric(4,1) not null default 0 check (receipt_margin_top_mm between 0 and 20),
+    receipt_line_spacing  numeric(3,2) not null default 1.20 check (receipt_line_spacing between 1.0 and 2.0),
+    receipt_base_font_px  numeric(4,1) not null default 11.0 check (receipt_base_font_px between 8 and 16),
+
     ms_rate           numeric(10,2) not null default 108.97,
     ms_density        numeric(6,1)  not null default 755.0,
     hsd_rate          numeric(10,2) not null default 92.00,

@@ -37,6 +37,7 @@ app.use(express.json());
 // needing a bundler/build step.
 // ---------------------------------------------------------------
 app.get('/env.js', (req, res) => {
+    res.set('Cache-Control', 'no-store');
     res.type('application/javascript').send(
         `window.__ENV__ = ${JSON.stringify({
             SUPABASE_URL,
@@ -46,7 +47,19 @@ app.get('/env.js', (req, res) => {
     );
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+    etag: true,
+    lastModified: true,
+    // Cache-Control: no-cache (NOT no-store) — the browser still keeps a
+    // local copy for speed, but is required to check back with the
+    // server on every load via ETag before using it. If a file changed,
+    // it gets the new one automatically; if not, the server just
+    // replies 304 and the cached copy is used. Either way, nobody has
+    // to manually clear their cache after you push an update.
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-cache');
+    },
+}));
 
 function usernameToEmail(username) {
     return `${username.trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
@@ -195,6 +208,7 @@ app.put('/api/config', requireAdmin, async (req, res) => {
         'receipt_footer', 'logo_url', 'logo_width_mm',
         'logo_margin_top_mm', 'logo_margin_bottom_mm', 'logo_align',
         'fp_id', 'nozzle_no', 'receipt_width_cm',
+        'receipt_margin_mm', 'receipt_margin_top_mm', 'receipt_line_spacing', 'receipt_base_font_px',
         'ms_rate', 'ms_density',
         'hsd_rate', 'hsd_density',
         'premium_rate', 'premium_density',

@@ -13,9 +13,34 @@ if (!window.__ENV__ || !window.__ENV__.SUPABASE_URL || !window.__ENV__.SUPABASE_
     throw new Error('Missing window.__ENV__ — is server.js running with a valid .env?');
 }
 
+// "Remember Me" support: the actual session tokens go to localStorage
+// (survives closing the browser/app) or sessionStorage (cleared when the
+// tab/browser closes) depending on a small preference flag. The flag
+// itself always lives in localStorage — it's not sensitive, just a
+// "true"/"false" marker — set by login.js right before signing in.
+const REMEMBER_FLAG_KEY = 'fueldesk:rememberMe';
+
+function activeAuthStorage() {
+    const remember = localStorage.getItem(REMEMBER_FLAG_KEY) !== 'false'; // defaults to true
+    return remember ? window.localStorage : window.sessionStorage;
+}
+
+window.FuelDeskSetRememberMe = function (remember) {
+    localStorage.setItem(REMEMBER_FLAG_KEY, remember ? 'true' : 'false');
+};
+
 // Named `sb` (not `supabase`) so we don't clobber the supabase-js library
 // namespace that the CDN script attaches to `window.supabase`.
 window.sb = window.supabase.createClient(
     window.__ENV__.SUPABASE_URL,
-    window.__ENV__.SUPABASE_ANON_KEY
+    window.__ENV__.SUPABASE_ANON_KEY,
+    {
+        auth: {
+            storage: {
+                getItem: (key) => activeAuthStorage().getItem(key),
+                setItem: (key, value) => activeAuthStorage().setItem(key, value),
+                removeItem: (key) => activeAuthStorage().removeItem(key),
+            },
+        },
+    }
 );

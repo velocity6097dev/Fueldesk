@@ -123,6 +123,7 @@
                 </div>
 
                 <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
+                <button type="button" class="btn btn-ghost btn-block" id="format-panel-btn" style="margin-top:10px;">Adjust Margins &amp; Spacing (Live)</button>
             </div>
 
             <!-- Pump identifiers + paper size -->
@@ -177,11 +178,12 @@
                 </div>
             </div>
 
+            <div class="app-footer-brand">Made by Velocity.logs</div>
         </div>
     </div>
 
     <!-- Populated by the "Preview Receipt" button -->
-    <div id="thermal-receipt"></div>
+    <div id="thermal-receipt" class="print-only"></div>
 
     <script src="/env.js"></script>
     <script src="/js/supabaseClient.js"></script>

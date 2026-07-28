@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FuelDesk — Format</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div class="app-screen">
+        <div class="app-topbar">
+            <div class="topbar-text" style="display:flex;align-items:center;gap:10px;">
+                <button type="button" class="topbar-icon-btn" id="back-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div>
+                    <strong>Format</strong>
+                    <div class="topbar-sub">Live preview — changes here apply to every template</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
+            </div>
+        </div>
+
+        <div class="app-main">
+
+            <div class="settings-block" style="padding:16px 8px;">
+                <div style="overflow-x:auto;">
+                    <div id="thermal-receipt" class="receipt-paper"></div>
+                </div>
+                <div class="hint text-center" style="margin-top:10px;">This is a live preview using sample numbers — nothing here is a real bill.</div>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Preview With</div>
+                <div class="field">
+                    <span>Template</span>
+                    <button type="button" class="picker-btn" id="template-picker-btn">
+                        <span id="template-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Margins &amp; Spacing</div>
+
+                <label class="field">
+                    <span>Side Margin (left + right)</span>
+                    <div class="range-row">
+                        <input type="range" id="margin-side" min="0" max="15" step="0.5" value="3">
+                        <span class="range-value" id="margin-side-value">3mm</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Space Before Content Starts</span>
+                    <div class="range-row">
+                        <input type="range" id="margin-top" min="0" max="20" step="0.5" value="0">
+                        <span class="range-value" id="margin-top-value">0mm</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Line Spacing</span>
+                    <div class="range-row">
+                        <input type="range" id="line-spacing" min="1" max="2" step="0.05" value="1.2">
+                        <span class="range-value" id="line-spacing-value">1.20</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Base Text Size</span>
+                    <div class="range-row">
+                        <input type="range" id="base-font" min="8" max="16" step="0.5" value="11">
+                        <span class="range-value" id="base-font-value">11px</span>
+                    </div>
+                </label>
+
+                <div class="settings-actions">
+                    <button type="button" id="save-format-btn" class="btn btn-primary btn-block">Save</button>
+                </div>
+            </div>
+
+            <div class="app-footer-brand">Made by Velocity.logs</div>
+        </div>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/supabaseClient.js"></script>
+    <script src="/js/authGuard.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/templates/registry.js"></script>
+    <script src="/templates/bpclTokheim.js"></script>
+    <script src="/templates/ioclTokheim.js"></script>
+    <script src="/templates/ioclGilbarco.js"></script>
+    <script src="/format.js"></script>
+</body>
+</html>

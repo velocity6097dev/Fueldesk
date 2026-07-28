@@ -41,6 +41,14 @@
 // Each template file should wrap its contents in an IIFE (see
 // ioclGilbarco.js) if it declares any top-level const/function — every
 // template <script> shares one global scope on the page.
+//
+// After calling template.render(data), pass the result through
+// BillTemplates.wrapForOutput(html, opts) before injecting it into the
+// receipt container — this applies the global margin/top-spacing/line-
+// height/base-font-size settings (edited live on the Format page) on
+// top of whatever the template itself renders. Templates should NOT
+// implement their own version of this — it's meant to be identical
+// regardless of which template is active.
 
 window.BillTemplates = (function () {
     const templates = {};
@@ -109,15 +117,45 @@ window.BillTemplates = (function () {
     // Shared by every template: renders the logo image (if the admin
     // uploaded one) or a template-specific placeholder, positioned per
     // the admin's alignment + top/bottom spacing settings.
+    //
+    // Centering is done two ways at once on purpose: `text-align` on a
+    // wrapper that's explicitly forced to 100% width, AND `margin:auto`
+    // block-centering on the image itself. Some simple HTML-to-thermal-
+    // printer converters only honor one of these — using both is what
+    // guarantees the logo is always actually centered across the paper's
+    // breadth rather than drifting depending on the renderer.
     function renderLogoBlock(station, placeholderHtml) {
-        const align = (station.logoAlign || 'CENTER').toLowerCase();
+        const align = (station.logoAlign || 'CENTER').toUpperCase();
         const top = station.logoMarginTopMm ?? 0;
         const bottom = station.logoMarginBottomMm ?? 4;
+
+        let imgMargin, wrapAlign;
+        if (align === 'LEFT') { imgMargin = 'margin:0 auto 0 0;'; wrapAlign = 'left'; }
+        else if (align === 'RIGHT') { imgMargin = 'margin:0 0 0 auto;'; wrapAlign = 'right'; }
+        else { imgMargin = 'margin:0 auto;'; wrapAlign = 'center'; }
+
         const inner = station.logoUrl
-            ? `<img class="receipt-logo-img" src="${escapeHtml(station.logoUrl)}" style="width:${station.logoWidthMm || 32}mm;">`
-            : placeholderHtml;
-        return `<div style="text-align:${align};margin-top:${top}mm;margin-bottom:${bottom}mm;">${inner}</div>`;
+            ? `<img class="receipt-logo-img" src="${escapeHtml(station.logoUrl)}" style="display:block;width:${station.logoWidthMm || 32}mm;${imgMargin}">`
+            : placeholderHtml; // placeholders already center via the wrapper's text-align below
+
+        return `<div style="display:block;width:100%;box-sizing:border-box;text-align:${wrapAlign};margin-top:${top}mm;margin-bottom:${bottom}mm;">${inner}</div>`;
     }
 
-    return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, COMMANDS_HELP_HTML };
+    // Applies GLOBAL formatting (side margin, top spacing, line height,
+    // base font size) around a template's rendered HTML. This is
+    // independent of any one template — used by billing.js / admin.js /
+    // format.js right before injecting into the receipt container, so it
+    // applies the same way no matter which template is active. Values
+    // come from daily_config (receipt_margin_mm, receipt_margin_top_mm,
+    // receipt_line_spacing, receipt_base_font_px), editable live with a
+    // preview on the Format page.
+    function wrapForOutput(innerHtml, opts = {}) {
+        const marginMm = opts.marginMm ?? 3;
+        const marginTopMm = opts.marginTopMm ?? 0;
+        const lineSpacing = opts.lineSpacing ?? 1.2;
+        const baseFontPx = opts.baseFontPx ?? 11;
+        return `<div style="box-sizing:border-box;width:100%;padding:${marginTopMm}mm ${marginMm}mm 0 ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;">${innerHtml}</div>`;
+    }
+
+    return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, wrapForOutput, COMMANDS_HELP_HTML };
 })();

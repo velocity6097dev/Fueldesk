@@ -541,6 +541,12 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 }
 .chip-btn.active { background: var(--amber); border-color: var(--amber); color: #fff; }
 
+/* ---------------- App branding footer (web pages only, never the printed receipt) ---------------- */
+.app-footer-brand {
+  text-align: center; font-size: 11px; color: var(--ink-soft);
+  opacity: 0.65; padding: 18px 0 6px;
+}
+
 /* ---------------- Small status tags (light bg, for lists) ---------------- */
 .tag {
   display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase;
@@ -597,43 +603,58 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   width: 44px; text-align: right; flex-shrink: 0;
 }
 
-/* ---------------- Thermal receipt (58mm) — always wins at print time ---------------- */
-#thermal-receipt { display: none; }
+/* ---------------- Thermal receipt content styles ----------------
+   These apply any time #thermal-receipt is visible — both the live
+   preview on the Format page AND the moment it's actually printed —
+   so what you see in the live editor is what comes out of the printer.
+   Only the print-specific mechanics below are wrapped in @media print. */
+#thermal-receipt {
+  background: #fff; color: #000; padding: 0;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.2;
+}
+#thermal-receipt .text-center { text-align: center; }
+#thermal-receipt .text-right { text-align: right; }
+#thermal-receipt .text-left { text-align: left; }
+#thermal-receipt .font-bold { font-weight: bold; }
+#thermal-receipt .uppercase { text-transform: uppercase; }
+#thermal-receipt .receipt-logo-box { display: inline-block; border: 1px solid #000; padding: 4px; width: 90px; font-size: 10px; line-height: 1; }
+#thermal-receipt .receipt-logo-img { display: inline-block; max-width: 100%; height: auto; }
+
+/* "Classic" dot-matrix style: label column + colon + value, aligned by
+   a fixed-width label instead of manually padding with spaces. */
+#thermal-receipt .classic-line { display: flex; margin-bottom: 1px; }
+#thermal-receipt .classic-label { display: inline-block; width: 54px; flex-shrink: 0; }
+#thermal-receipt .classic-circle-logo {
+    width: 70px; height: 70px; border-radius: 50%; border: 2px solid #000;
+    display: inline-flex; align-items: center; justify-content: center; position: relative;
+}
+#thermal-receipt .classic-circle-logo::before {
+    content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 1px solid #000;
+}
+#thermal-receipt .classic-circle-logo span { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.1; }
+#thermal-receipt .grid-3-col { display: grid; grid-template-columns: 90px 10px 1fr; row-gap: 2px; }
+#thermal-receipt .grid-tax { display: grid; grid-template-columns: 105px 10px 1fr; row-gap: 2px; font-size: 10px; }
+#thermal-receipt .flex-between { display: flex; justify-content: space-between; margin-bottom: 2px; }
+#thermal-receipt .my-2 { margin-top: 8px; margin-bottom: 8px; }
+#thermal-receipt .my-3 { margin-top: 12px; margin-bottom: 12px; }
+
+/* ---------------- Hidden-until-print (billing.html / admin.html use this) ---------------- */
+#thermal-receipt.print-only { display: none; }
 
 @media print {
   body * { visibility: hidden !important; }
   body { background: #fff !important; }
-  @page { margin: 0; size: 58mm auto; }
+  @page { margin: 0; size: 58mm auto; } /* overridden per-print by applyReceiptWidth() in ui.js */
 
-  #thermal-receipt, #thermal-receipt * { visibility: visible !important; }
-  #thermal-receipt {
+  #thermal-receipt.print-only, #thermal-receipt.print-only * { visibility: visible !important; }
+  #thermal-receipt.print-only {
     display: block !important; position: absolute; left: 0; top: 0; width: 58mm;
-    background: #fff; color: #000; padding: 4px;
-    font-family: var(--font-mono); font-size: 11px; line-height: 1.2;
   }
-  #thermal-receipt .text-center { text-align: center; }
-  #thermal-receipt .text-right { text-align: right; }
-  #thermal-receipt .text-left { text-align: left; }
-  #thermal-receipt .font-bold { font-weight: bold; }
-  #thermal-receipt .uppercase { text-transform: uppercase; }
-  #thermal-receipt .receipt-logo-box { display: inline-block; border: 1px solid #000; padding: 4px; width: 90px; font-size: 10px; line-height: 1; }
-  #thermal-receipt .receipt-logo-img { display: inline-block; max-width: 100%; height: auto; }
+}
 
-  /* "Classic" dot-matrix style: label column + colon + value, aligned by
-     a fixed-width label instead of manually padding with spaces. */
-  #thermal-receipt .classic-line { display: flex; margin-bottom: 1px; }
-  #thermal-receipt .classic-label { display: inline-block; width: 54px; flex-shrink: 0; }
-  #thermal-receipt .classic-circle-logo {
-      width: 70px; height: 70px; border-radius: 50%; border: 2px solid #000;
-      display: inline-flex; align-items: center; justify-content: center; position: relative;
-  }
-  #thermal-receipt .classic-circle-logo::before {
-      content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 1px solid #000;
-  }
-  #thermal-receipt .classic-circle-logo span { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.1; }
-  #thermal-receipt .grid-3-col { display: grid; grid-template-columns: 90px 10px 1fr; row-gap: 2px; }
-  #thermal-receipt .grid-tax { display: grid; grid-template-columns: 105px 10px 1fr; row-gap: 2px; font-size: 10px; }
-  #thermal-receipt .flex-between { display: flex; justify-content: space-between; margin-bottom: 2px; }
-  #thermal-receipt .my-2 { margin-top: 8px; margin-bottom: 8px; }
-  #thermal-receipt .my-3 { margin-top: 12px; margin-bottom: 12px; }
+/* ---------------- On-screen "paper" presentation (Format page live preview) ---------------- */
+.receipt-paper {
+  margin: 0 auto; box-shadow: 0 6px 24px rgba(11,53,86,0.18);
+  border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
+  transition: width 0.15s ease;
 }

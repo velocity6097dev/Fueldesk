@@ -44,6 +44,8 @@ form.addEventListener('submit', async (e) => {
     loginBtn.disabled = true;
     loginBtn.textContent = 'Logging in...';
 
+    window.FuelDeskSetRememberMe(document.getElementById('remember-me').checked);
+
     const email = `${username}@${window.__ENV__.AUTH_EMAIL_DOMAIN}`;
     const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
 
