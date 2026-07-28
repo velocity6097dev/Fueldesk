@@ -206,8 +206,9 @@ app.put('/api/config', requireAdmin, async (req, res) => {
     const allowedFields = [
         'station_name', 'station_address', 'station_phone', 'station_gstin',
         'receipt_footer', 'logo_url', 'logo_width_mm',
-        'logo_margin_top_mm', 'logo_margin_bottom_mm', 'logo_align',
-        'fp_id', 'nozzle_no', 'receipt_width_cm',
+        'logo_position_pct', 'logo_margin_top_mm', 'logo_margin_bottom_mm',
+        'logo_ratio_locked', 'logo_height_mm',
+        'receipt_width_cm',
         'receipt_margin_mm', 'receipt_margin_top_mm', 'receipt_line_spacing', 'receipt_base_font_px',
         'ms_rate', 'ms_density',
         'hsd_rate', 'hsd_density',

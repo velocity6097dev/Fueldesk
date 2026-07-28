@@ -1,6 +1,27 @@
 const TEMPLATE_OPTIONS_FALLBACK = [];
 let stationConfig = null; // real station name/address/logo/footer, for a meaningful preview
+let paperWidthCm = 5.8;
 
+const receiptEl = document.getElementById('thermal-receipt');
+
+// ---- Logo controls ----
+const logoPositionSlider = document.getElementById('logo-position');
+const logoPositionValue = document.getElementById('logo-position-value');
+const logoWidthSlider = document.getElementById('logo-width');
+const logoWidthValue = document.getElementById('logo-width-value');
+const logoRatioLock = document.getElementById('logo-ratio-lock');
+const logoHeightField = document.getElementById('logo-height-field');
+const logoHeightSlider = document.getElementById('logo-height');
+const logoHeightValue = document.getElementById('logo-height-value');
+const logoMarginTopSlider = document.getElementById('logo-margin-top');
+const logoMarginTopValue = document.getElementById('logo-margin-top-value');
+const logoMarginBottomSlider = document.getElementById('logo-margin-bottom');
+const logoMarginBottomValue = document.getElementById('logo-margin-bottom-value');
+
+// ---- Paper ----
+const paperWidthSegmented = document.getElementById('paper-width-segmented');
+
+// ---- Margins & spacing ----
 const marginSideSlider = document.getElementById('margin-side');
 const marginSideValue = document.getElementById('margin-side-value');
 const marginTopSlider = document.getElementById('margin-top');
@@ -10,7 +31,6 @@ const lineSpacingValue = document.getElementById('line-spacing-value');
 const baseFontSlider = document.getElementById('base-font');
 const baseFontValue = document.getElementById('base-font-value');
 const saveFormatBtn = document.getElementById('save-format-btn');
-const receiptEl = document.getElementById('thermal-receipt');
 
 document.getElementById('back-btn').addEventListener('click', () => window.location.href = '/admin.html');
 
@@ -50,17 +70,17 @@ function sampleData() {
             phone: stationConfig?.station_phone || '',
             gstin: stationConfig?.station_gstin || '',
             logoUrl: stationConfig?.logo_url || null,
-            logoWidthMm: stationConfig?.logo_width_mm ?? 32,
-            logoMarginTopMm: stationConfig?.logo_margin_top_mm ?? 0,
-            logoMarginBottomMm: stationConfig?.logo_margin_bottom_mm ?? 4,
-            logoAlign: stationConfig?.logo_align ?? 'CENTER',
+            logoWidthMm: Number(logoWidthSlider.value),
+            logoPositionPct: Number(logoPositionSlider.value),
+            logoMarginTopMm: Number(logoMarginTopSlider.value),
+            logoMarginBottomMm: Number(logoMarginBottomSlider.value),
+            logoRatioLocked: logoRatioLock.checked,
+            logoHeightMm: Number(logoHeightSlider.value),
         },
         footer: stationConfig?.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: 'G0000',
         transactionId: '0000000000000001',
         billDateTimeIso: new Date().toISOString(),
-        fpId: stationConfig?.fp_id || '1',
-        nozzleNo: stationConfig?.nozzle_no || '1',
         product: 'MS',
         productLabel: 'MS (Petrol)',
         density: stationConfig?.ms_density || '755.0',
@@ -82,7 +102,7 @@ function renderPreview() {
     const template = window.BillTemplates.get(templatePicker.get());
     const rendered = template.render(sampleData());
 
-    receiptEl.style.width = `${stationConfig?.receipt_width_cm ?? 5.8}cm`;
+    receiptEl.style.width = `${paperWidthCm}cm`;
     receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: Number(marginSideSlider.value),
         marginTopMm: Number(marginTopSlider.value),
@@ -97,16 +117,58 @@ function wireLiveSlider(slider, valueEl, format) {
         renderPreview();
     });
 }
+
+wireLiveSlider(logoWidthSlider, logoWidthValue, (v) => `${v}mm`);
+wireLiveSlider(logoHeightSlider, logoHeightValue, (v) => `${v}mm`);
+wireLiveSlider(logoMarginTopSlider, logoMarginTopValue, (v) => `${v}mm`);
+wireLiveSlider(logoMarginBottomSlider, logoMarginBottomValue, (v) => `${v}mm`);
 wireLiveSlider(marginSideSlider, marginSideValue, (v) => `${v}mm`);
 wireLiveSlider(marginTopSlider, marginTopValue, (v) => `${v}mm`);
 wireLiveSlider(lineSpacingSlider, lineSpacingValue, (v) => Number(v).toFixed(2));
 wireLiveSlider(baseFontSlider, baseFontValue, (v) => `${v}px`);
+
+logoPositionSlider.addEventListener('input', () => {
+    const v = Number(logoPositionSlider.value);
+    logoPositionValue.textContent = v === 0 ? 'Left' : v === 100 ? 'Right' : v === 50 ? 'Center' : `${v}%`;
+    renderPreview();
+});
+
+logoRatioLock.addEventListener('change', () => {
+    logoHeightField.style.display = logoRatioLock.checked ? 'none' : 'block';
+    renderPreview();
+});
+
+document.getElementById('base-font-minus').addEventListener('click', () => {
+    baseFontSlider.value = Math.max(Number(baseFontSlider.min), Number(baseFontSlider.value) - 0.5);
+    baseFontValue.textContent = `${baseFontSlider.value}px`;
+    renderPreview();
+});
+document.getElementById('base-font-plus').addEventListener('click', () => {
+    baseFontSlider.value = Math.min(Number(baseFontSlider.max), Number(baseFontSlider.value) + 0.5);
+    baseFontValue.textContent = `${baseFontSlider.value}px`;
+    renderPreview();
+});
+
+paperWidthSegmented.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        paperWidthCm = Number(btn.dataset.cm);
+        paperWidthSegmented.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
+        renderPreview();
+    });
+});
 
 saveFormatBtn.addEventListener('click', async () => {
     saveFormatBtn.disabled = true;
     saveFormatBtn.textContent = 'Saving...';
     try {
         await patchConfig({
+            logo_position_pct: Number(logoPositionSlider.value),
+            logo_width_mm: Number(logoWidthSlider.value),
+            logo_ratio_locked: logoRatioLock.checked,
+            logo_height_mm: Number(logoHeightSlider.value),
+            logo_margin_top_mm: Number(logoMarginTopSlider.value),
+            logo_margin_bottom_mm: Number(logoMarginBottomSlider.value),
+            receipt_width_cm: paperWidthCm,
             receipt_margin_mm: Number(marginSideSlider.value),
             receipt_margin_top_mm: Number(marginTopSlider.value),
             receipt_line_spacing: Number(lineSpacingSlider.value),
@@ -128,6 +190,28 @@ async function loadConfig() {
         return;
     }
     stationConfig = data;
+
+    logoPositionSlider.value = data.logo_position_pct ?? 50;
+    const v = Number(logoPositionSlider.value);
+    logoPositionValue.textContent = v === 0 ? 'Left' : v === 100 ? 'Right' : v === 50 ? 'Center' : `${v}%`;
+
+    logoWidthSlider.value = data.logo_width_mm ?? 32;
+    logoWidthValue.textContent = `${logoWidthSlider.value}mm`;
+
+    logoRatioLock.checked = data.logo_ratio_locked ?? true;
+    logoHeightField.style.display = logoRatioLock.checked ? 'none' : 'block';
+    logoHeightSlider.value = data.logo_height_mm ?? 20;
+    logoHeightValue.textContent = `${logoHeightSlider.value}mm`;
+
+    logoMarginTopSlider.value = data.logo_margin_top_mm ?? 0;
+    logoMarginTopValue.textContent = `${logoMarginTopSlider.value}mm`;
+    logoMarginBottomSlider.value = data.logo_margin_bottom_mm ?? 4;
+    logoMarginBottomValue.textContent = `${logoMarginBottomSlider.value}mm`;
+
+    paperWidthCm = Number(data.receipt_width_cm ?? 5.8);
+    paperWidthSegmented.querySelectorAll('button').forEach((b) => {
+        b.classList.toggle('active', Math.abs(Number(b.dataset.cm) - paperWidthCm) < 0.05);
+    });
 
     marginSideSlider.value = data.receipt_margin_mm ?? 3;
     marginSideValue.textContent = `${marginSideSlider.value}mm`;

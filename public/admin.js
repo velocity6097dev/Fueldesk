@@ -12,18 +12,7 @@ const logoPreview = document.getElementById('logo-preview');
 const logoUploadBtn = document.getElementById('logo-upload-btn');
 const logoRemoveBtn = document.getElementById('logo-remove-btn');
 const logoFileInput = document.getElementById('logo-file-input');
-const logoWidthSlider = document.getElementById('logo-width');
-const logoWidthValue = document.getElementById('logo-width-value');
-const logoMarginTopSlider = document.getElementById('logo-margin-top');
-const logoMarginTopValue = document.getElementById('logo-margin-top-value');
-const logoMarginBottomSlider = document.getElementById('logo-margin-bottom');
-const logoMarginBottomValue = document.getElementById('logo-margin-bottom-value');
-const logoAlignSegmented = document.getElementById('logo-align-segmented');
 const previewReceiptBtn = document.getElementById('preview-receipt-btn');
-
-const fpIdInput = document.getElementById('fp-id');
-const nozzleNoInput = document.getElementById('nozzle-no');
-const receiptWidthInput = document.getElementById('receipt-width');
 
 const msRateInput = document.getElementById('ms-rate');
 const msDensityInput = document.getElementById('ms-density');
@@ -35,8 +24,7 @@ const premiumDensityInput = document.getElementById('premium-density');
 const saveConfigBtn = document.getElementById('save-config-btn');
 
 let currentLogoUrl = null;
-let currentLogoAlign = 'CENTER';
-let currentConfig = null;
+let currentConfig = null; // full loaded row — logo position/size/lock, margins, etc. now live only in the Format panel, but Preview here needs to read them
 
 const templatePicker = makePickerField({
     buttonEl: document.getElementById('template-picker-btn'),
@@ -114,7 +102,7 @@ logoFileInput.addEventListener('change', async () => {
         currentLogoUrl = url;
         renderLogoPreview(url);
         await patchConfig({ logo_url: url });
-        Toast.show('Logo updated.');
+        Toast.show('Logo updated. Adjust its size/position in the Format panel.');
     } catch (err) {
         Toast.show('Could not upload logo: ' + err.message, { error: true, duration: 5000 });
     } finally {
@@ -135,38 +123,6 @@ logoRemoveBtn.addEventListener('click', async () => {
     }
 });
 
-// Live-updating sliders that persist as soon as you let go (no need to
-// hit "Save Settings" just to see/keep a logo tweak).
-function wireLiveRange(slider, valueEl, unit, configKey) {
-    slider.addEventListener('input', () => { valueEl.textContent = `${slider.value}${unit}`; });
-    slider.addEventListener('change', async () => {
-        try {
-            await patchConfig({ [configKey]: Number(slider.value) });
-        } catch (err) {
-            Toast.show('Could not save: ' + err.message, { error: true });
-        }
-    });
-}
-wireLiveRange(logoWidthSlider, logoWidthValue, 'mm', 'logo_width_mm');
-wireLiveRange(logoMarginTopSlider, logoMarginTopValue, 'mm', 'logo_margin_top_mm');
-wireLiveRange(logoMarginBottomSlider, logoMarginBottomValue, 'mm', 'logo_margin_bottom_mm');
-
-logoAlignSegmented.querySelectorAll('button').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-        currentLogoAlign = btn.dataset.value;
-        logoAlignSegmented.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b === btn));
-        try {
-            await patchConfig({ logo_align: currentLogoAlign });
-        } catch (err) {
-            Toast.show('Could not save alignment: ' + err.message, { error: true });
-        }
-    });
-});
-
-document.querySelectorAll('.chip-btn[data-cm]').forEach((btn) => {
-    btn.addEventListener('click', () => { receiptWidthInput.value = btn.dataset.cm; });
-});
-
 async function loadConfig() {
     const { data, error } = await window.sb.from('daily_config').select('*').eq('id', 1).single();
     if (error || !data) {
@@ -183,20 +139,6 @@ async function loadConfig() {
 
     currentLogoUrl = data.logo_url || null;
     renderLogoPreview(currentLogoUrl);
-
-    logoWidthSlider.value = data.logo_width_mm ?? 32;
-    logoWidthValue.textContent = `${logoWidthSlider.value}mm`;
-    logoMarginTopSlider.value = data.logo_margin_top_mm ?? 0;
-    logoMarginTopValue.textContent = `${logoMarginTopSlider.value}mm`;
-    logoMarginBottomSlider.value = data.logo_margin_bottom_mm ?? 4;
-    logoMarginBottomValue.textContent = `${logoMarginBottomSlider.value}mm`;
-
-    currentLogoAlign = data.logo_align || 'CENTER';
-    logoAlignSegmented.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.value === currentLogoAlign));
-
-    fpIdInput.value = data.fp_id || '1';
-    nozzleNoInput.value = data.nozzle_no || '1';
-    receiptWidthInput.value = data.receipt_width_cm ?? 5.8;
 
     msRateInput.value = data.ms_rate;
     msDensityInput.value = data.ms_density;
@@ -221,13 +163,6 @@ saveConfigBtn.addEventListener('click', async () => {
             station_phone: stationPhoneInput.value.trim(),
             station_gstin: stationGstinInput.value.trim(),
             receipt_footer: receiptFooterInput.value,
-            logo_width_mm: Number(logoWidthSlider.value),
-            logo_margin_top_mm: Number(logoMarginTopSlider.value),
-            logo_margin_bottom_mm: Number(logoMarginBottomSlider.value),
-            logo_align: currentLogoAlign,
-            fp_id: fpIdInput.value.trim() || '1',
-            nozzle_no: nozzleNoInput.value.trim() || '1',
-            receipt_width_cm: parseFloat(receiptWidthInput.value) || 5.8,
             ms_rate: parseFloat(msRateInput.value),
             ms_density: parseFloat(msDensityInput.value),
             hsd_rate: parseFloat(hsdRateInput.value),
@@ -245,9 +180,9 @@ saveConfigBtn.addEventListener('click', async () => {
     }
 });
 
-previewReceiptBtn.addEventListener('click', () => {
+previewReceiptBtn.addEventListener('click', async () => {
     const template = window.BillTemplates.get(templatePicker.get());
-    applyReceiptWidth(parseFloat(receiptWidthInput.value) || 5.8);
+    applyReceiptWidth(currentConfig?.receipt_width_cm ?? 5.8);
     const rendered = template.render({
         station: {
             name: stationNameInput.value.trim() || 'Your Service Station',
@@ -255,17 +190,17 @@ previewReceiptBtn.addEventListener('click', () => {
             phone: stationPhoneInput.value.trim(),
             gstin: stationGstinInput.value.trim(),
             logoUrl: currentLogoUrl,
-            logoWidthMm: Number(logoWidthSlider.value),
-            logoMarginTopMm: Number(logoMarginTopSlider.value),
-            logoMarginBottomMm: Number(logoMarginBottomSlider.value),
-            logoAlign: currentLogoAlign,
+            logoWidthMm: currentConfig?.logo_width_mm,
+            logoPositionPct: currentConfig?.logo_position_pct,
+            logoMarginTopMm: currentConfig?.logo_margin_top_mm,
+            logoMarginBottomMm: currentConfig?.logo_margin_bottom_mm,
+            logoRatioLocked: currentConfig?.logo_ratio_locked,
+            logoHeightMm: currentConfig?.logo_height_mm,
         },
         footer: receiptFooterInput.value || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: 'G0000',
         transactionId: '0000000000000001',
         billDateTimeIso: new Date().toISOString(),
-        fpId: fpIdInput.value.trim() || '1',
-        nozzleNo: nozzleNoInput.value.trim() || '1',
         product: 'MS',
         productLabel: 'MS (Petrol)',
         density: msDensityInput.value || '755.0',
@@ -282,12 +217,14 @@ previewReceiptBtn.addEventListener('click', () => {
         mobileNo: '9876543210',
     });
 
-    document.getElementById('thermal-receipt').innerHTML = window.BillTemplates.wrapForOutput(rendered, {
+    const receiptEl = document.getElementById('thermal-receipt');
+    receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: currentConfig?.receipt_margin_mm,
         marginTopMm: currentConfig?.receipt_margin_top_mm,
         lineSpacing: currentConfig?.receipt_line_spacing,
         baseFontPx: currentConfig?.receipt_base_font_px,
     });
+    await waitForReceiptImages(receiptEl);
     window.print();
 });
 

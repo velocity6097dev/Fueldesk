@@ -481,6 +481,16 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 }
 .stat-chip b { font-family: var(--font-mono); font-weight: 700; }
 
+/* ---------------- Stepper (+/-) buttons, e.g. text size ---------------- */
+.stepper-row { display: flex; align-items: center; gap: 10px; }
+.stepper-btn {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  border: 1.5px solid var(--line); background: var(--paper); color: var(--navy);
+  font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.stepper-btn:active { background: var(--line-soft); }
+
 /* ---------------- Extra button variant + small utilities ---------------- */
 .btn-success { background: var(--green); color: #fff; }
 .btn-success:hover { background: #256a4c; }
@@ -543,9 +553,15 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 
 /* ---------------- App branding footer (web pages only, never the printed receipt) ---------------- */
 .app-footer-brand {
-  text-align: center; font-size: 11px; color: var(--ink-soft);
-  opacity: 0.65; padding: 18px 0 6px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: fit-content; margin: 22px auto 4px; padding: 8px 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--navy), var(--navy-dark));
+  box-shadow: 0 4px 14px rgba(11,53,86,0.28);
+  color: #fff; font-family: var(--font-display); font-size: 11.5px;
+  font-weight: 700; letter-spacing: 0.3px; white-space: nowrap;
 }
+.app-footer-brand .bolt { color: var(--amber); font-size: 13px; line-height: 1; }
 
 /* ---------------- Small status tags (light bg, for lists) ---------------- */
 .tag {
@@ -646,9 +662,17 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   body { background: #fff !important; }
   @page { margin: 0; size: 58mm auto; } /* overridden per-print by applyReceiptWidth() in ui.js */
 
+  /* Elements like .app-screen (min-height:100vh) and html/body
+     (height:100%) still reserve their full layout height even while
+     hidden, which can push the page height past a single sheet and
+     print a blank second page. Collapse them during print. */
+  html, body { height: auto !important; min-height: 0 !important; }
+  .app-screen { min-height: 0 !important; height: auto !important; }
+
   #thermal-receipt.print-only, #thermal-receipt.print-only * { visibility: visible !important; }
   #thermal-receipt.print-only {
     display: block !important; position: absolute; left: 0; top: 0; width: 58mm;
+    page-break-after: avoid; page-break-inside: avoid;
   }
 }
 

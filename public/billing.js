@@ -211,16 +211,16 @@ printBtn.addEventListener('click', async () => {
             gstin: currentConfig.station_gstin,
             logoUrl: currentConfig.logo_url,
             logoWidthMm: currentConfig.logo_width_mm,
+            logoPositionPct: currentConfig.logo_position_pct,
             logoMarginTopMm: currentConfig.logo_margin_top_mm,
             logoMarginBottomMm: currentConfig.logo_margin_bottom_mm,
-            logoAlign: currentConfig.logo_align,
+            logoRatioLocked: currentConfig.logo_ratio_locked,
+            logoHeightMm: currentConfig.logo_height_mm,
         },
         footer: currentConfig.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: inserted.receipt_no,
         transactionId: String(inserted.id).padStart(16, '0'),
         billDateTimeIso: billDateTime.toISOString(),
-        fpId: currentConfig.fp_id || '1',
-        nozzleNo: currentConfig.nozzle_no || '1',
         product,
         productLabel: PRODUCT_LABELS[product] || product,
         density: density,
@@ -237,7 +237,8 @@ printBtn.addEventListener('click', async () => {
         mobileNo,
     });
 
-    document.getElementById('thermal-receipt').innerHTML = window.BillTemplates.wrapForOutput(rendered, {
+    const receiptEl = document.getElementById('thermal-receipt');
+    receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: currentConfig.receipt_margin_mm,
         marginTopMm: currentConfig.receipt_margin_top_mm,
         lineSpacing: currentConfig.receipt_line_spacing,
@@ -245,6 +246,11 @@ printBtn.addEventListener('click', async () => {
     });
 
     applyReceiptWidth(currentConfig.receipt_width_cm);
+    // Make sure the logo has actually finished loading before printing —
+    // otherwise printing right after typing a bill can capture the
+    // receipt before a freshly-set <img src> has downloaded, leaving the
+    // logo blank until you print again (once the browser has cached it).
+    await waitForReceiptImages(receiptEl);
     window.print();
 
     inputValue.value = '';

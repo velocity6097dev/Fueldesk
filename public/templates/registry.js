@@ -8,15 +8,20 @@
 // `data` shape (all fields already formatted as strings unless noted):
 //   {
 //     station: {
-//       name, address, phone, gstin,
-//       logoUrl, logoWidthMm, logoMarginTopMm, logoMarginBottomMm, logoAlign,
+//       name, address, phone, gstin, logoUrl, logoWidthMm,
+//       logoPositionPct, logoMarginTopMm, logoMarginBottomMm,
+//       logoRatioLocked, logoHeightMm,
 //     },
 //     footer,                          // printed at the bottom, may contain "\n" + commands
-//     receiptNo, transactionId, billDateTimeIso, fpId, nozzleNo, product, productLabel,
+//     receiptNo, transactionId, billDateTimeIso, product, productLabel,
 //     density, presetTypeLabel, rate, volume, amount,
 //     dateStr, timeStr, printDateStr, printTimeStr,
 //     attendantUsername, vehicleNo, mobileNo
 //   }
+//
+// FP ID / Nozzle No are NOT passed in `data` — every template generates
+// these itself via BillTemplates.randomFpId() / randomNozzleNo() (fresh
+// on every render, matching a real pump printer's jitter between bills).
 //
 // `billDateTimeIso` is the bill's timestamp as a full ISO string — use
 // this (via `new Date(data.billDateTimeIso)`) if a template needs a date
@@ -116,29 +121,47 @@ window.BillTemplates = (function () {
 
     // Shared by every template: renders the logo image (if the admin
     // uploaded one) or a template-specific placeholder, positioned per
-    // the admin's alignment + top/bottom spacing settings.
+    // the admin's continuous position slider (0 = flush left, 50 =
+    // centered, 100 = flush right) + top/bottom spacing settings.
     //
-    // Centering is done two ways at once on purpose: `text-align` on a
-    // wrapper that's explicitly forced to 100% width, AND `margin:auto`
-    // block-centering on the image itself. Some simple HTML-to-thermal-
-    // printer converters only honor one of these — using both is what
-    // guarantees the logo is always actually centered across the paper's
-    // breadth rather than drifting depending on the renderer.
+    // Position uses `margin-left: calc((100% - width) * pos/100)` — this
+    // is exact at ANY slider value, not just three fixed stops, and
+    // still resolves to a normal length value (mixing % and mm is valid
+    // CSS), so it's as compatible as the old fixed left/center/right.
+    //
+    // Aspect ratio: locked (default) means height is always "auto", so
+    // the logo can never look stretched no matter what width you pick.
+    // Unlocked means logoHeightMm is used explicitly too — width and
+    // height become independent, which CAN distort the image; that's
+    // the point of unlocking it.
     function renderLogoBlock(station, placeholderHtml) {
-        const align = (station.logoAlign || 'CENTER').toUpperCase();
         const top = station.logoMarginTopMm ?? 0;
         const bottom = station.logoMarginBottomMm ?? 4;
-
-        let imgMargin, wrapAlign;
-        if (align === 'LEFT') { imgMargin = 'margin:0 auto 0 0;'; wrapAlign = 'left'; }
-        else if (align === 'RIGHT') { imgMargin = 'margin:0 0 0 auto;'; wrapAlign = 'right'; }
-        else { imgMargin = 'margin:0 auto;'; wrapAlign = 'center'; }
+        const posPct = Math.max(0, Math.min(100, station.logoPositionPct ?? 50));
+        const widthMm = station.logoWidthMm || 32;
+        const marginLeft = `calc((100% - ${widthMm}mm) * ${(posPct / 100).toFixed(3)})`;
+        const heightRule = (!station.logoRatioLocked && station.logoHeightMm)
+            ? `height:${station.logoHeightMm}mm;`
+            : 'height:auto;';
 
         const inner = station.logoUrl
-            ? `<img class="receipt-logo-img" src="${escapeHtml(station.logoUrl)}" style="display:block;width:${station.logoWidthMm || 32}mm;${imgMargin}">`
-            : placeholderHtml; // placeholders already center via the wrapper's text-align below
+            ? `<img class="receipt-logo-img" src="${escapeHtml(station.logoUrl)}" style="display:block;width:${widthMm}mm;${heightRule}margin-left:${marginLeft};margin-right:0;">`
+            : placeholderHtml; // generic placeholder box — a rough left/center/right zone is precise enough for it
 
+        const wrapAlign = posPct < 33 ? 'left' : posPct > 67 ? 'right' : 'center';
         return `<div style="display:block;width:100%;box-sizing:border-box;text-align:${wrapAlign};margin-top:${top}mm;margin-bottom:${bottom}mm;">${inner}</div>`;
+    }
+
+    // Every template uses these for FP ID / Nozzle No — freshly
+    // randomized on every print/preview to match a real pump printer's
+    // jitter between bills. Purely cosmetic: your real receipt number,
+    // database row id, and everything used for reporting/attribution
+    // elsewhere in the app are completely unaffected.
+    function randomFpId() {
+        return Math.random() < 0.5 ? '1' : '2';
+    }
+    function randomNozzleNo() {
+        return String(Math.floor(Math.random() * 4) + 1); // 1-4
     }
 
     // Applies GLOBAL formatting (side margin, top spacing, line height,
@@ -157,5 +180,5 @@ window.BillTemplates = (function () {
         return `<div style="box-sizing:border-box;width:100%;padding:${marginTopMm}mm ${marginMm}mm 0 ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;">${innerHtml}</div>`;
     }
 
-    return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, wrapForOutput, COMMANDS_HELP_HTML };
+    return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, wrapForOutput, randomFpId, randomNozzleNo, COMMANDS_HELP_HTML };
 })();

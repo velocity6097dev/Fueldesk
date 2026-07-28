@@ -73,39 +73,6 @@
                     <div class="hint" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
                 </div>
 
-                <div class="field" style="margin-top:14px;">
-                    <span>Logo Alignment</span>
-                    <div class="segmented" id="logo-align-segmented">
-                        <button type="button" data-value="LEFT">Left</button>
-                        <button type="button" data-value="CENTER" class="active">Center</button>
-                        <button type="button" data-value="RIGHT">Right</button>
-                    </div>
-                </div>
-
-                <div class="settings-grid" style="margin-top:14px;">
-                    <label class="field">
-                        <span>Logo Width</span>
-                        <div class="range-row">
-                            <input type="range" id="logo-width" min="15" max="50" step="1" value="32">
-                            <span class="range-value" id="logo-width-value">32mm</span>
-                        </div>
-                    </label>
-                    <label class="field">
-                        <span>Space Above</span>
-                        <div class="range-row">
-                            <input type="range" id="logo-margin-top" min="0" max="30" step="1" value="0">
-                            <span class="range-value" id="logo-margin-top-value">0mm</span>
-                        </div>
-                    </label>
-                </div>
-                <label class="field" style="margin-top:14px;">
-                    <span>Space Below</span>
-                    <div class="range-row">
-                        <input type="range" id="logo-margin-bottom" min="0" max="30" step="1" value="4">
-                        <span class="range-value" id="logo-margin-bottom-value">4mm</span>
-                    </div>
-                </label>
-
                 <label class="field" style="margin-top:14px;">
                     <span class="field-label-row">
                         Receipt Footer
@@ -123,32 +90,8 @@
                 </div>
 
                 <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
-                <button type="button" class="btn btn-ghost btn-block" id="format-panel-btn" style="margin-top:10px;">Adjust Margins &amp; Spacing (Live)</button>
-            </div>
-
-            <!-- Pump identifiers + paper size -->
-            <div class="settings-block">
-                <div class="block-title">Pump &amp; Paper Setup</div>
-                <div class="settings-grid">
-                    <label class="field">
-                        <span>FP / DU ID</span>
-                        <input type="text" id="fp-id" placeholder="1">
-                    </label>
-                    <label class="field">
-                        <span>Nozzle No.</span>
-                        <input type="text" id="nozzle-no" placeholder="1">
-                    </label>
-                </div>
-
-                <label class="field" style="margin-top:14px;">
-                    <span>Bill Width (cm)</span>
-                    <input type="number" id="receipt-width" step="0.1" min="4" max="12" placeholder="5.8">
-                </label>
-                <div class="chip-row">
-                    <button type="button" class="chip-btn" data-cm="5.8">58mm</button>
-                    <button type="button" class="chip-btn" data-cm="8.0">80mm</button>
-                </div>
-                <div class="hint" style="margin-top:8px;">Length is automatic based on content, like a real thermal paper roll — only width is fixed.</div>
+                <div class="hint" style="margin-top:8px;">FP ID and nozzle number are generated automatically and vary on every bill — no setup needed.</div>
+                <button type="button" class="btn btn-primary btn-block" id="format-panel-btn" style="margin-top:14px;">Open Format Panel — Sizing, Position &amp; Spacing</button>
             </div>
 
             <!-- Rates & density -->
@@ -178,7 +121,7 @@
                 </div>
             </div>
 
-            <div class="app-footer-brand">Made by Velocity.logs</div>
+            <div class="app-footer-brand"><span class="bolt">&#9889;</span> Made by Velocity.logs</div>
         </div>
     </div>
 

@@ -17,6 +17,7 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/002_photo_vehicle_mobile.sql`
      - `sql/migrations/003_logo_position_width_commands.sql`
      - `sql/migrations/004_format_panel.sql`
+     - `sql/migrations/005_logo_slider_random_pump_ids.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
@@ -239,6 +240,57 @@ saved until you tap "Save."
 screen in the app (login, Billing, Settings, Staff, Format) — never on
 the printed receipt itself.
 
+## Second round of fixes
+
+**Everything sizing/position/spacing now lives in one place: Format.**
+Logo alignment, logo width, logo top/bottom spacing, and paper width
+used to be split between Settings and Format. They're all in Format now
+— Settings only has the logo *upload* button (since that's a file
+action, not a slider) plus station details, footer, and rates.
+
+**Logo alignment is a slider now, not three buttons.** Drag anywhere
+from Left to Right (0–100%), not just three fixed stops — 50% is exact
+center. Uses `margin-left: calc((100% - width) * position)`, which is
+exact at any position, not an approximation.
+
+**Logo aspect-ratio lock.** New toggle in Format: locked (default)
+means height always follows width automatically, so the logo can never
+end up stretched. Unlock it and a Height slider appears, letting you
+set width and height independently if you want to.
+
+**Fixed: "Base Text Size" doing nothing.** This was a real bug — the
+Gilbarco template had its own internal fixed-pixel sizes for every
+line, which silently overrode the global slider (CSS gives an
+element's own explicit size priority over an inherited one). All three
+templates now use sizes *relative* to the global base (`em` units, not
+`px`), so the one Base Text Size control actually scales the whole
+receipt — confirmed by literally rendering the same bill at two
+different sizes and checking the output differs. There are also +/−
+buttons next to the slider now for quick nudges.
+
+**Removed: Pump & Paper Setup.** FP ID and Nozzle No are no longer
+admin-configured — every template now generates them randomly on each
+bill (this was already true for the Gilbarco layout; now it's true for
+all three). "Paper Width" moved into Format as a simple 58mm/80mm
+choice, since it's a sizing control like everything else there.
+
+**Fixed: phone number with no label on the Gilbarco template.** Now
+prints `PH. <number>` instead of the bare digits.
+
+**Fixed: logo sometimes missing right after entering a bill.** Printing
+immediately after typing a bill could capture the receipt before a
+freshly-set logo `<img>` had actually finished loading — it would then
+"start working" only because the browser had since cached the image.
+Billing/Settings/Format now explicitly wait for the logo to finish
+loading (with a 2.5s safety timeout for a slow/broken image) before the
+print dialog opens.
+
+**Fixed: blank second page when printing.** `.app-screen` had
+`min-height: 100vh` and `html`/`body` had `height: 100%` — even hidden
+via `visibility:hidden` during print, they still reserved their full
+layout height, which could push the page past a single sheet and print
+an extra blank page. These now collapse to `height: auto` during print.
+
 ## Adding another receipt template
 
 1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
@@ -247,6 +299,13 @@ the printed receipt itself.
 2. Change `id`, `label`, and the HTML inside `render()`. If your new
    file declares any top-level `const`/`function`, wrap the whole thing
    in an IIFE like `ioclGilbarco.js` does.
+   - Use `em` for any font-size you set, not `px` — the global "Receipt
+     Text Size" control in Format only works if templates size things
+     relative to the inherited base, not with their own fixed pixel
+     values (that was a real bug in an earlier version).
+   - Use `window.BillTemplates.randomFpId()` / `randomNozzleNo()` for
+     FP ID / Nozzle No — don't add new admin-configured fields for
+     these, every template generates them randomly per bill on purpose.
 3. Add `<script src="/templates/myBrand.js"></script>` in both
    `billing.html` and `admin.html`, after `registry.js`.
 4. It'll show up automatically in the Settings "Receipt Template" picker

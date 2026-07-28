@@ -17,7 +17,7 @@
                 </button>
                 <div>
                     <strong>Format</strong>
-                    <div class="topbar-sub">Live preview — changes here apply to every template</div>
+                    <div class="topbar-sub">Live preview — everything here applies to every template</div>
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
@@ -31,7 +31,7 @@
                 <div style="overflow-x:auto;">
                     <div id="thermal-receipt" class="receipt-paper"></div>
                 </div>
-                <div class="hint text-center" style="margin-top:10px;">This is a live preview using sample numbers — nothing here is a real bill.</div>
+                <div class="hint text-center" style="margin-top:10px;">Live preview using sample numbers — nothing here is a real bill.</div>
             </div>
 
             <div class="settings-block">
@@ -43,6 +43,75 @@
                         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                     </button>
                 </div>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Logo</div>
+                <div class="block-sub">Only has an effect if you've uploaded a logo photo in Settings.</div>
+
+                <label class="field" style="margin-top:10px;">
+                    <span>Horizontal Position</span>
+                    <div class="range-row">
+                        <input type="range" id="logo-position" min="0" max="100" step="1" value="50">
+                        <span class="range-value" id="logo-position-value">Center</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-soft);margin-top:2px;">
+                        <span>Left</span><span>Center</span><span>Right</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Width</span>
+                    <div class="range-row">
+                        <input type="range" id="logo-width" min="15" max="50" step="1" value="32">
+                        <span class="range-value" id="logo-width-value">32mm</span>
+                    </div>
+                </label>
+
+                <div class="field" style="margin-top:14px;">
+                    <span class="field-label-row" style="text-transform:none;font-size:13px;font-weight:600;color:var(--ink);">
+                        <input type="checkbox" id="logo-ratio-lock" checked style="width:auto;">
+                        Keep width/height ratio locked
+                    </span>
+                    <div class="hint" style="margin-top:4px;">Locked: height follows width automatically — the logo can't look stretched. Unlock to set height independently.</div>
+                </div>
+
+                <label class="field" id="logo-height-field" style="margin-top:14px;display:none;">
+                    <span>Height (unlocked)</span>
+                    <div class="range-row">
+                        <input type="range" id="logo-height" min="5" max="60" step="1" value="20">
+                        <span class="range-value" id="logo-height-value">20mm</span>
+                    </div>
+                </label>
+
+                <div class="settings-grid" style="margin-top:14px;">
+                    <label class="field">
+                        <span>Space Above</span>
+                        <div class="range-row">
+                            <input type="range" id="logo-margin-top" min="0" max="30" step="1" value="0">
+                            <span class="range-value" id="logo-margin-top-value">0mm</span>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span>Space Below</span>
+                        <div class="range-row">
+                            <input type="range" id="logo-margin-bottom" min="0" max="30" step="1" value="4">
+                            <span class="range-value" id="logo-margin-bottom-value">4mm</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Printer / Paper</div>
+                <div class="field">
+                    <span>Paper Width</span>
+                    <div class="segmented" id="paper-width-segmented">
+                        <button type="button" data-cm="5.8" class="active">58mm</button>
+                        <button type="button" data-cm="8.0">80mm</button>
+                    </div>
+                </div>
+                <div class="hint" style="margin-top:8px;">Length is automatic based on content, like a real thermal paper roll — only width is fixed.</div>
             </div>
 
             <div class="settings-block">
@@ -73,11 +142,16 @@
                 </label>
 
                 <label class="field" style="margin-top:14px;">
-                    <span>Base Text Size</span>
-                    <div class="range-row">
-                        <input type="range" id="base-font" min="8" max="16" step="0.5" value="11">
-                        <span class="range-value" id="base-font-value">11px</span>
+                    <span>Receipt Text Size</span>
+                    <div class="stepper-row">
+                        <button type="button" class="stepper-btn" id="base-font-minus" aria-label="Decrease text size">−</button>
+                        <div class="range-row" style="flex:1;">
+                            <input type="range" id="base-font" min="8" max="16" step="0.5" value="11">
+                            <span class="range-value" id="base-font-value">11px</span>
+                        </div>
+                        <button type="button" class="stepper-btn" id="base-font-plus" aria-label="Increase text size">+</button>
                     </div>
+                    <div class="hint" style="margin-top:6px;">This is the single control for how big or small the whole receipt prints. Watch the preview above as you move it.</div>
                 </label>
 
                 <div class="settings-actions">
@@ -85,7 +159,7 @@
                 </div>
             </div>
 
-            <div class="app-footer-brand">Made by Velocity.logs</div>
+            <div class="app-footer-brand"><span class="bolt">&#9889;</span> Made by Velocity.logs</div>
         </div>
     </div>
 

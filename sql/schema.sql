@@ -79,14 +79,16 @@ create table if not exists daily_config (
     -- plain text logo box. Uploaded to the "station-assets" storage bucket.
     logo_url            text,
     logo_width_mm       numeric(4,1) not null default 32.0 check (logo_width_mm between 15 and 50),
+    -- 0 = flush left, 50 = centered, 100 = flush right — a continuous
+    -- slider position, not a fixed left/center/right choice.
+    logo_position_pct   numeric(5,1) not null default 50.0 check (logo_position_pct between 0 and 100),
     logo_margin_top_mm  numeric(4,1) not null default 0 check (logo_margin_top_mm between 0 and 30),
     logo_margin_bottom_mm numeric(4,1) not null default 4 check (logo_margin_bottom_mm between 0 and 30),
-    logo_align          varchar(10) not null default 'CENTER' check (logo_align in ('LEFT', 'CENTER', 'RIGHT')),
-
-    -- Fixed identifiers some templates print (e.g. the classic dot-matrix
-    -- Indian Oil layout). Free text since dealers label these differently.
-    fp_id               varchar(10) not null default '1',
-    nozzle_no           varchar(10) not null default '1',
+    -- Locked (default): height always follows width automatically, so the
+    -- logo can never look stretched. Unlocked: logo_height_mm also
+    -- applies, so width/height can be set independently.
+    logo_ratio_locked   boolean not null default true,
+    logo_height_mm      numeric(4,1) check (logo_height_mm between 5 and 60),
 
     -- Printed receipt width, in centimeters. 5.8 = 58mm thermal paper
     -- (the common default), 8.0 = 80mm. Height is always "auto", like a

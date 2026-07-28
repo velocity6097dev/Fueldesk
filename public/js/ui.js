@@ -74,6 +74,31 @@ function wireCommandsInfoButton(buttonEl, fieldLabel) {
     });
 }
 
+// Waits for any <img> inside the receipt (i.e. the logo) to finish
+// loading before printing. Without this, printing right after the page
+// injects a fresh logo <img src="..."> can capture the receipt before
+// the image has actually downloaded/decoded, so the logo prints blank
+// — it would then work the next time only because the browser had
+// since cached the image. Falls back to a timeout so a broken/slow
+// image can never hang the print indefinitely.
+function waitForReceiptImages(container, timeoutMs = 2500) {
+    const imgs = Array.from(container.querySelectorAll('img'));
+    if (imgs.length === 0) return Promise.resolve();
+
+    const loaded = imgs.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true }); // don't hang forever on a broken image
+        });
+    });
+
+    return Promise.race([
+        Promise.all(loaded),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+}
+
 // Injects/updates a <style> tag that sets the printed receipt's paper
 // width (in cm). Call this before window.print() so @page picks it up.
 // Falls back to the 58mm default in style.css if never called.
