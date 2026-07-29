@@ -32,7 +32,7 @@ const productPicker = makePickerField({
     labelEl: document.getElementById('product-picker-label'),
     title: 'Select Product',
     options: PRODUCT_OPTIONS,
-    initialValue: 'MS',
+    initialValue: 'HSD',
 });
 document.getElementById('product-picker-btn').addEventListener('picker-change', updateLiveStats);
 
