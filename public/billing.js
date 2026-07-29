@@ -208,7 +208,6 @@ printBtn.addEventListener('click', async () => {
             name: currentConfig.station_name,
             address: currentConfig.station_address,
             phone: currentConfig.station_phone,
-            gstin: currentConfig.station_gstin,
             logoUrl: currentConfig.logo_url,
             logoWidthMm: currentConfig.logo_width_mm,
             logoPositionPct: currentConfig.logo_position_pct,
@@ -243,6 +242,7 @@ printBtn.addEventListener('click', async () => {
         marginTopMm: currentConfig.receipt_margin_top_mm,
         lineSpacing: currentConfig.receipt_line_spacing,
         baseFontPx: currentConfig.receipt_base_font_px,
+        footerSpaceMm: currentConfig.receipt_footer_space_mm,
     });
 
     applyReceiptWidth(currentConfig.receipt_width_cm);

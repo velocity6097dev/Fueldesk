@@ -18,6 +18,7 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/003_logo_position_width_commands.sql`
      - `sql/migrations/004_format_panel.sql`
      - `sql/migrations/005_logo_slider_random_pump_ids.sql`
+     - `sql/migrations/006_footer_space.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
@@ -290,6 +291,45 @@ print dialog opens.
 via `visibility:hidden` during print, they still reserved their full
 layout height, which could push the page past a single sheet and print
 an extra blank page. These now collapse to `height: auto` during print.
+
+## Third round of fixes
+
+**Fixed: "Space Before Content Starts" doing nothing in print.** This
+was a genuine CSS bug, not a fake explanation — margin collapsing. The
+wrapper div had no non-zero top padding by default, so a child's
+`margin-top` (e.g. the logo's "Space Above") could collapse straight
+through it and leak out *above* the wrapper instead of pushing content
+down *inside* it. Fixed with `display: flow-root` on the wrapper, which
+gives it a proper containing block so margins always behave the way the
+sliders promise — verified by rendering the same bill and checking the
+actual padding shows up in the output.
+
+**New: "Space Below Footer."** Extra blank space at the very bottom of
+the receipt, after the footer — useful as paper feed before tearing
+off. Lives in Format alongside the other spacing controls.
+
+**Logo shifting when changing text size.** I could not find a code path
+where the logo's own width/position (both set in `mm`/`%`, never `em`)
+mathematically depends on font size — but the margin-collapsing bug
+above is a very plausible explanation for it *looking* that way, since
+an inconsistently-collapsing margin combined with line-height (which
+scales with font size) would make the whole layout reflow
+unpredictably around the logo. Also defensively added `vertical-align:
+top` to the no-logo placeholder shapes, since inline-block elements can
+shift with line-height regardless. If the logo still visibly resizes
+(not just repositions) after this update, let me know specifically
+whether it's the width or the position that's changing — that'll help
+me find whatever's left.
+
+**Removed the GSTIN field** from Settings and every template — it's
+gone from the form, not just hidden when blank.
+
+**12-hour auto-logout.** Independent of "Remember Me" (which only
+controls whether a session survives closing the browser) — after 12
+hours from login, the next page load signs you out and sends you back
+to `/login.html` with an explanation. Existing sessions from before
+this update get a fresh 12-hour clock starting now, rather than being
+logged out immediately.
 
 ## Adding another receipt template
 

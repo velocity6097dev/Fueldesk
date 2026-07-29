@@ -8,7 +8,7 @@
 // `data` shape (all fields already formatted as strings unless noted):
 //   {
 //     station: {
-//       name, address, phone, gstin, logoUrl, logoWidthMm,
+//       name, address, phone, logoUrl, logoWidthMm,
 //       logoPositionPct, logoMarginTopMm, logoMarginBottomMm,
 //       logoRatioLocked, logoHeightMm,
 //     },
@@ -149,7 +149,7 @@ window.BillTemplates = (function () {
             : placeholderHtml; // generic placeholder box — a rough left/center/right zone is precise enough for it
 
         const wrapAlign = posPct < 33 ? 'left' : posPct > 67 ? 'right' : 'center';
-        return `<div style="display:block;width:100%;box-sizing:border-box;text-align:${wrapAlign};margin-top:${top}mm;margin-bottom:${bottom}mm;">${inner}</div>`;
+        return `<div style="display:flow-root;width:100%;box-sizing:border-box;text-align:${wrapAlign};margin-top:${top}mm;margin-bottom:${bottom}mm;">${inner}</div>`;
     }
 
     // Every template uses these for FP ID / Nozzle No — freshly
@@ -165,19 +165,29 @@ window.BillTemplates = (function () {
     }
 
     // Applies GLOBAL formatting (side margin, top spacing, line height,
-    // base font size) around a template's rendered HTML. This is
-    // independent of any one template — used by billing.js / admin.js /
-    // format.js right before injecting into the receipt container, so it
-    // applies the same way no matter which template is active. Values
-    // come from daily_config (receipt_margin_mm, receipt_margin_top_mm,
-    // receipt_line_spacing, receipt_base_font_px), editable live with a
-    // preview on the Format page.
+    // base font size, space after the footer) around a template's
+    // rendered HTML. This is independent of any one template — used by
+    // billing.js / admin.js / format.js right before injecting into the
+    // receipt container, so it applies the same way no matter which
+    // template is active. Values come from daily_config
+    // (receipt_margin_mm, receipt_margin_top_mm, receipt_line_spacing,
+    // receipt_base_font_px, receipt_footer_space_mm), editable live with
+    // a preview on the Format page.
+    //
+    // `display:flow-root` is important here, not decorative: without it,
+    // a child's margin-top (e.g. the logo's "Space Above") can CSS-
+    // collapse straight through this wrapper and leak out above it
+    // instead of pushing content down inside it — which looked exactly
+    // like "Space Above does nothing." flow-root gives this wrapper its
+    // own containing block, so margins always behave the way the
+    // sliders promise.
     function wrapForOutput(innerHtml, opts = {}) {
         const marginMm = opts.marginMm ?? 3;
         const marginTopMm = opts.marginTopMm ?? 0;
         const lineSpacing = opts.lineSpacing ?? 1.2;
         const baseFontPx = opts.baseFontPx ?? 11;
-        return `<div style="box-sizing:border-box;width:100%;padding:${marginTopMm}mm ${marginMm}mm 0 ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;">${innerHtml}</div>`;
+        const footerSpaceMm = opts.footerSpaceMm ?? 4;
+        return `<div style="display:flow-root;box-sizing:border-box;width:100%;padding:${marginTopMm}mm ${marginMm}mm ${footerSpaceMm}mm ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;">${innerHtml}</div>`;
     }
 
     return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, wrapForOutput, randomFpId, randomNozzleNo, COMMANDS_HELP_HTML };

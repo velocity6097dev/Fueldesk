@@ -12,9 +12,33 @@ window.FuelDeskAuth = (function () {
         STATION_STAFF: '/billing.html',
     };
 
+    const MAX_SESSION_MS = 12 * 60 * 60 * 1000; // 12 hours
+    const LOGIN_AT_KEY = 'fueldesk:loginAt';
+
     function goToLogin(message) {
         const q = message ? `?msg=${encodeURIComponent(message)}` : '';
         window.location.replace(`/login.html${q}`);
+    }
+
+    // Forces a fresh login every 12 hours, regardless of "Remember Me" —
+    // that setting only controls whether the session survives closing
+    // the browser, not how long it lasts while open. If there's no
+    // recorded login time (e.g. a session that was already active before
+    // this feature shipped), we start the clock now instead of logging
+    // someone out unexpectedly.
+    async function enforceSessionAge() {
+        const loginAt = Number(localStorage.getItem(LOGIN_AT_KEY));
+        if (!loginAt) {
+            localStorage.setItem(LOGIN_AT_KEY, String(Date.now()));
+            return true;
+        }
+        if (Date.now() - loginAt > MAX_SESSION_MS) {
+            await window.sb.auth.signOut();
+            localStorage.removeItem(LOGIN_AT_KEY);
+            goToLogin('You were logged out after 12 hours for security. Please log in again.');
+            return false;
+        }
+        return true;
     }
 
     async function requireSession(requiredRole) {
@@ -24,6 +48,8 @@ window.FuelDeskAuth = (function () {
             goToLogin('Please log in to continue.');
             return null;
         }
+
+        if (!(await enforceSessionAge())) return null;
 
         const { data: profile, error: profileError } = await window.sb
             .from('profiles')
@@ -61,6 +87,7 @@ window.FuelDeskAuth = (function () {
         document.querySelectorAll('.logout-btn').forEach((btn) => {
             btn.addEventListener('click', async () => {
                 await window.sb.auth.signOut();
+                localStorage.removeItem(LOGIN_AT_KEY);
                 window.location.replace('/login.html');
             });
         });

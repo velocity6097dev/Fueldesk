@@ -26,6 +26,8 @@ const marginSideSlider = document.getElementById('margin-side');
 const marginSideValue = document.getElementById('margin-side-value');
 const marginTopSlider = document.getElementById('margin-top');
 const marginTopValue = document.getElementById('margin-top-value');
+const footerSpaceSlider = document.getElementById('footer-space');
+const footerSpaceValue = document.getElementById('footer-space-value');
 const lineSpacingSlider = document.getElementById('line-spacing');
 const lineSpacingValue = document.getElementById('line-spacing-value');
 const baseFontSlider = document.getElementById('base-font');
@@ -68,7 +70,6 @@ function sampleData() {
             name: stationConfig?.station_name || 'Your Service Station',
             address: stationConfig?.station_address || '',
             phone: stationConfig?.station_phone || '',
-            gstin: stationConfig?.station_gstin || '',
             logoUrl: stationConfig?.logo_url || null,
             logoWidthMm: Number(logoWidthSlider.value),
             logoPositionPct: Number(logoPositionSlider.value),
@@ -108,6 +109,7 @@ function renderPreview() {
         marginTopMm: Number(marginTopSlider.value),
         lineSpacing: Number(lineSpacingSlider.value),
         baseFontPx: Number(baseFontSlider.value),
+        footerSpaceMm: Number(footerSpaceSlider.value),
     });
 }
 
@@ -124,6 +126,7 @@ wireLiveSlider(logoMarginTopSlider, logoMarginTopValue, (v) => `${v}mm`);
 wireLiveSlider(logoMarginBottomSlider, logoMarginBottomValue, (v) => `${v}mm`);
 wireLiveSlider(marginSideSlider, marginSideValue, (v) => `${v}mm`);
 wireLiveSlider(marginTopSlider, marginTopValue, (v) => `${v}mm`);
+wireLiveSlider(footerSpaceSlider, footerSpaceValue, (v) => `${v}mm`);
 wireLiveSlider(lineSpacingSlider, lineSpacingValue, (v) => Number(v).toFixed(2));
 wireLiveSlider(baseFontSlider, baseFontValue, (v) => `${v}px`);
 
@@ -173,6 +176,7 @@ saveFormatBtn.addEventListener('click', async () => {
             receipt_margin_top_mm: Number(marginTopSlider.value),
             receipt_line_spacing: Number(lineSpacingSlider.value),
             receipt_base_font_px: Number(baseFontSlider.value),
+            receipt_footer_space_mm: Number(footerSpaceSlider.value),
         });
         Toast.show('Format saved — every bill will use this from now on.');
     } catch (err) {
@@ -217,6 +221,8 @@ async function loadConfig() {
     marginSideValue.textContent = `${marginSideSlider.value}mm`;
     marginTopSlider.value = data.receipt_margin_top_mm ?? 0;
     marginTopValue.textContent = `${marginTopSlider.value}mm`;
+    footerSpaceSlider.value = data.receipt_footer_space_mm ?? 4;
+    footerSpaceValue.textContent = `${footerSpaceSlider.value}mm`;
     lineSpacingSlider.value = data.receipt_line_spacing ?? 1.2;
     lineSpacingValue.textContent = Number(lineSpacingSlider.value).toFixed(2);
     baseFontSlider.value = data.receipt_base_font_px ?? 11;

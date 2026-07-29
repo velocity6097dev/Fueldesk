@@ -103,6 +103,10 @@ create table if not exists daily_config (
     receipt_margin_top_mm numeric(4,1) not null default 0 check (receipt_margin_top_mm between 0 and 20),
     receipt_line_spacing  numeric(3,2) not null default 1.20 check (receipt_line_spacing between 1.0 and 2.0),
     receipt_base_font_px  numeric(4,1) not null default 11.0 check (receipt_base_font_px between 8 and 16),
+    -- Extra space left after the footer, at the very bottom of the
+    -- receipt — useful for thermal printers that need a bit of blank
+    -- feed before the paper is torn off.
+    receipt_footer_space_mm numeric(4,1) not null default 4.0 check (receipt_footer_space_mm between 0 and 30),
 
     ms_rate           numeric(10,2) not null default 108.97,
     ms_density        numeric(6,1)  not null default 755.0,

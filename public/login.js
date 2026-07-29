@@ -45,6 +45,7 @@ form.addEventListener('submit', async (e) => {
     loginBtn.textContent = 'Logging in...';
 
     window.FuelDeskSetRememberMe(document.getElementById('remember-me').checked);
+    localStorage.setItem('fueldesk:loginAt', String(Date.now()));
 
     const email = `${username}@${window.__ENV__.AUTH_EMAIL_DOMAIN}`;
     const { data, error } = await window.sb.auth.signInWithPassword({ email, password });

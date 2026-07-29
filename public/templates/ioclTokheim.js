@@ -23,7 +23,6 @@
                 ${formattedBlock(s.name, `font-size:${SCALE.stationName}em;`, 'center')}
                 ${s.address ? formattedBlock(s.address, `font-size:${SCALE.addressPhone}em;`) : ''}
                 ${s.phone ? `<div style="font-size:${SCALE.addressPhone}em;">Ph: ${escapeHtml(s.phone)}</div>` : ''}
-                ${s.gstin ? `<div style="font-size:${SCALE.addressPhone}em;">GSTIN: ${escapeHtml(s.gstin)}</div>` : ''}
                 <div class="my-2"></div>
                 <div class="grid-3-col">
                     <span>Bill No.</span><span>:</span><span class="text-right">${data.receiptNo}</span>

@@ -5,7 +5,6 @@ const whoami = document.getElementById('whoami');
 const stationNameInput = document.getElementById('station-name');
 const stationAddressInput = document.getElementById('station-address');
 const stationPhoneInput = document.getElementById('station-phone');
-const stationGstinInput = document.getElementById('station-gstin');
 const receiptFooterInput = document.getElementById('receipt-footer');
 
 const logoPreview = document.getElementById('logo-preview');
@@ -134,7 +133,6 @@ async function loadConfig() {
     stationNameInput.value = data.station_name || '';
     stationAddressInput.value = data.station_address || '';
     stationPhoneInput.value = data.station_phone || '';
-    stationGstinInput.value = data.station_gstin || '';
     receiptFooterInput.value = data.receipt_footer || '';
 
     currentLogoUrl = data.logo_url || null;
@@ -161,7 +159,6 @@ saveConfigBtn.addEventListener('click', async () => {
             station_name: stationNameInput.value.trim(),
             station_address: stationAddressInput.value, // keep newlines/commands as typed
             station_phone: stationPhoneInput.value.trim(),
-            station_gstin: stationGstinInput.value.trim(),
             receipt_footer: receiptFooterInput.value,
             ms_rate: parseFloat(msRateInput.value),
             ms_density: parseFloat(msDensityInput.value),
@@ -188,7 +185,6 @@ previewReceiptBtn.addEventListener('click', async () => {
             name: stationNameInput.value.trim() || 'Your Service Station',
             address: stationAddressInput.value,
             phone: stationPhoneInput.value.trim(),
-            gstin: stationGstinInput.value.trim(),
             logoUrl: currentLogoUrl,
             logoWidthMm: currentConfig?.logo_width_mm,
             logoPositionPct: currentConfig?.logo_position_pct,
@@ -223,6 +219,7 @@ previewReceiptBtn.addEventListener('click', async () => {
         marginTopMm: currentConfig?.receipt_margin_top_mm,
         lineSpacing: currentConfig?.receipt_line_spacing,
         baseFontPx: currentConfig?.receipt_base_font_px,
+        footerSpaceMm: currentConfig?.receipt_footer_space_mm,
     });
     await waitForReceiptImages(receiptEl);
     window.print();

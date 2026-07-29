@@ -204,12 +204,13 @@ app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
 // ---------------------------------------------------------------
 app.put('/api/config', requireAdmin, async (req, res) => {
     const allowedFields = [
-        'station_name', 'station_address', 'station_phone', 'station_gstin',
+        'station_name', 'station_address', 'station_phone',
         'receipt_footer', 'logo_url', 'logo_width_mm',
         'logo_position_pct', 'logo_margin_top_mm', 'logo_margin_bottom_mm',
         'logo_ratio_locked', 'logo_height_mm',
         'receipt_width_cm',
-        'receipt_margin_mm', 'receipt_margin_top_mm', 'receipt_line_spacing', 'receipt_base_font_px',
+        'receipt_margin_mm', 'receipt_margin_top_mm', 'receipt_line_spacing',
+        'receipt_base_font_px', 'receipt_footer_space_mm',
         'ms_rate', 'ms_density',
         'hsd_rate', 'hsd_density',
         'premium_rate', 'premium_density',
