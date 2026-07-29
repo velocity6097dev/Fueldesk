@@ -41,7 +41,7 @@ const modePicker = makePickerField({
     labelEl: document.getElementById('mode-picker-label'),
     title: 'Select Billing Mode',
     options: MODE_OPTIONS,
-    initialValue: 'VOLUME',
+    initialValue: 'AMOUNT',
 });
 document.getElementById('mode-picker-btn').addEventListener('picker-change', updateInputLabel);
 
