@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const { createDiscordIntegration } = require('./discord');
 
 const {
     PORT = 3000,
@@ -22,10 +23,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
 
 // Service-role client: bypasses Row Level Security. Server-side only,
 // never sent to the browser. Used to create/deactivate staff logins and
-// to write admin settings after we've verified the caller is an admin.
+// to write admin settings after we've verified the caller's role.
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
 });
+
+const discord = createDiscordIntegration(supabaseAdmin);
 
 const app = express();
 app.use(express.json());
@@ -33,8 +36,6 @@ app.use(express.json());
 // ---------------------------------------------------------------
 // Public runtime config for the browser (anon key only — this key
 // is meant to be public, Row Level Security is what protects data).
-// This is what lets the front-end files use `.env` values without
-// needing a bundler/build step.
 // ---------------------------------------------------------------
 app.get('/env.js', (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -52,10 +53,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
     lastModified: true,
     // Cache-Control: no-cache (NOT no-store) — the browser still keeps a
     // local copy for speed, but is required to check back with the
-    // server on every load via ETag before using it. If a file changed,
-    // it gets the new one automatically; if not, the server just
-    // replies 304 and the cached copy is used. Either way, nobody has
-    // to manually clear their cache after you push an update.
+    // server on every load via ETag before using it. Nobody has to
+    // manually clear their cache after an update.
     setHeaders: (res) => {
         res.setHeader('Cache-Control', 'no-cache');
     },
@@ -65,56 +64,96 @@ function usernameToEmail(username) {
     return `${username.trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
 }
 
+const RANK = { SUPER_ADMIN: 3, ADMIN_STAFF: 2, STATION_STAFF: 1 };
+
 // ---------------------------------------------------------------
-// requireAdmin: verifies the bearer token belongs to a real,
-// active, ADMIN_STAFF user before letting a request through.
+// Auth middlewares. All three verify the bearer token belongs to a
+// real, active user and attach req.authUser / req.profile — they only
+// differ in which role(s) they let through.
 // ---------------------------------------------------------------
-async function requireAdmin(req, res, next) {
-    try {
-        const authHeader = req.headers.authorization || '';
-        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-        if (!token) return res.status(401).json({ error: 'Missing Authorization header' });
+async function loadProfileFromToken(req) {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return { error: 'Missing Authorization header', status: 401 };
 
-        const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
-        if (userError || !userData?.user) {
-            return res.status(401).json({ error: 'Invalid or expired session' });
-        }
-
-        const { data: profile, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('*')
-            .eq('id', userData.user.id)
-            .single();
-
-        if (profileError || !profile || profile.role !== 'ADMIN_STAFF' || !profile.is_active) {
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-
-        req.authUser = userData.user;
-        req.profile = profile;
-        next();
-    } catch (err) {
-        console.error('requireAdmin error:', err);
-        res.status(500).json({ error: 'Auth check failed' });
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !userData?.user) {
+        return { error: 'Invalid or expired session', status: 401 };
     }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('id', userData.user.id)
+        .single();
+
+    if (profileError || !profile || !profile.is_active) {
+        return { error: 'Account not found or inactive', status: 403 };
+    }
+
+    return { authUser: userData.user, profile };
+}
+
+// Any active, logged-in user — station staff included. Used for routes
+// like bill-created notifications, which staff trigger by billing.
+async function requireActiveUser(req, res, next) {
+    const result = await loadProfileFromToken(req);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    req.authUser = result.authUser;
+    req.profile = result.profile;
+    next();
+}
+
+// Admin Staff or Super Admin.
+async function requireAdmin(req, res, next) {
+    const result = await loadProfileFromToken(req);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    if (!RANK[result.profile.role] || RANK[result.profile.role] < RANK.ADMIN_STAFF) {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    req.authUser = result.authUser;
+    req.profile = result.profile;
+    next();
+}
+
+// Super Admin only — branding, format, integrations, and managing
+// Admin-tier accounts.
+async function requireSuperAdmin(req, res, next) {
+    const result = await loadProfileFromToken(req);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    if (result.profile.role !== 'SUPER_ADMIN') {
+        return res.status(403).json({ error: 'Super Admin access required' });
+    }
+    req.authUser = result.authUser;
+    req.profile = result.profile;
+    next();
 }
 
 // ---------------------------------------------------------------
-// Staff management (admin only)
+// Staff management. Each rank can only see/create/modify ranks
+// strictly below it: Super Admin manages everyone, Admin Staff
+// manages Station Staff only, Station Staff has no access at all
+// (this route requires requireAdmin, so they're already blocked).
 // ---------------------------------------------------------------
 
 app.get('/api/staff', requireAdmin, async (req, res) => {
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
         .from('profiles')
-        .select('id, username, role, is_active, created_at')
+        .select('id, username, display_name, role, is_active, created_at')
         .order('created_at', { ascending: false });
 
+    if (req.profile.role === 'ADMIN_STAFF') {
+        query = query.eq('role', 'STATION_STAFF');
+    }
+
+    const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     res.json({ staff: data });
 });
 
 app.post('/api/staff', requireAdmin, async (req, res) => {
-    const { username, password, role } = req.body || {};
+    const { username, password, role, display_name: displayNameRaw } = req.body || {};
+    const displayName = (displayNameRaw || '').trim().slice(0, 80) || null;
 
     if (!username || !/^[a-zA-Z0-9_.-]{3,50}$/.test(username)) {
         return res.status(400).json({ error: 'Username must be 3-50 characters (letters, numbers, _ . -)' });
@@ -122,8 +161,12 @@ app.post('/api/staff', requireAdmin, async (req, res) => {
     if (!password || password.length < 6) {
         return res.status(400).json({ error: 'Password/PIN must be at least 6 characters' });
     }
-    if (!['ADMIN_STAFF', 'STATION_STAFF'].includes(role)) {
-        return res.status(400).json({ error: 'Role must be ADMIN_STAFF or STATION_STAFF' });
+    if (!RANK[role]) {
+        return res.status(400).json({ error: 'Role must be SUPER_ADMIN, ADMIN_STAFF, or STATION_STAFF' });
+    }
+    // Admin Staff can only create Station Staff — never their own tier or above.
+    if (req.profile.role === 'ADMIN_STAFF' && role !== 'STATION_STAFF') {
+        return res.status(403).json({ error: 'Admins can only create Station Staff accounts' });
     }
 
     const email = usernameToEmail(username);
@@ -144,6 +187,7 @@ app.post('/api/staff', requireAdmin, async (req, res) => {
     const { error: profileError } = await supabaseAdmin.from('profiles').insert([{
         id: created.user.id,
         username,
+        display_name: displayName,
         role,
         is_active: true,
     }]);
@@ -154,23 +198,61 @@ app.post('/api/staff', requireAdmin, async (req, res) => {
         return res.status(500).json({ error: profileError.message });
     }
 
-    res.status(201).json({ id: created.user.id, username, role, is_active: true });
+    res.status(201).json({ id: created.user.id, username, display_name: displayName, role, is_active: true });
 });
+
+async function assertCanManageTarget(req, res, targetId) {
+    if (targetId === req.authUser.id) {
+        res.status(400).json({ error: "You can't modify your own account here" });
+        return null;
+    }
+    const { data: target, error } = await supabaseAdmin
+        .from('profiles')
+        .select('id, role')
+        .eq('id', targetId)
+        .single();
+    if (error || !target) {
+        res.status(404).json({ error: 'Staff member not found' });
+        return null;
+    }
+    if (RANK[req.profile.role] <= RANK[target.role]) {
+        res.status(403).json({ error: 'You can only manage accounts below your own rank' });
+        return null;
+    }
+    return target;
+}
 
 app.patch('/api/staff/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    const { is_active, role } = req.body || {};
+    const target = await assertCanManageTarget(req, res, id);
+    if (!target) return; // response already sent
 
-    if (id === req.authUser.id && is_active === false) {
-        return res.status(400).json({ error: "You can't deactivate your own account" });
-    }
-
+    const { is_active, role, display_name: displayNameRaw } = req.body || {};
     const updates = {};
     if (typeof is_active === 'boolean') updates.is_active = is_active;
-    if (role && ['ADMIN_STAFF', 'STATION_STAFF'].includes(role)) updates.role = role;
+    if (typeof displayNameRaw === 'string') updates.display_name = displayNameRaw.trim().slice(0, 80) || null;
+    if (role) {
+        if (!RANK[role]) return res.status(400).json({ error: 'Invalid role' });
+        if (req.profile.role === 'ADMIN_STAFF' && role !== 'STATION_STAFF') {
+            return res.status(403).json({ error: 'Admins can only assign the Station Staff role' });
+        }
+        updates.role = role;
+    }
 
     if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: 'Nothing to update' });
+    }
+
+    // Safety net: never let the last active Super Admin be demoted/deactivated.
+    if (target.role === 'SUPER_ADMIN' && (updates.is_active === false || (updates.role && updates.role !== 'SUPER_ADMIN'))) {
+        const { count } = await supabaseAdmin
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'SUPER_ADMIN')
+            .eq('is_active', true);
+        if ((count ?? 0) <= 1) {
+            return res.status(400).json({ error: 'This is the last active Super Admin — promote another account first' });
+        }
     }
 
     const { data, error } = await supabaseAdmin
@@ -186,9 +268,8 @@ app.patch('/api/staff/:id', requireAdmin, async (req, res) => {
 
 app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
-    if (id === req.authUser.id) {
-        return res.status(400).json({ error: "You can't delete your own account" });
-    }
+    const target = await assertCanManageTarget(req, res, id);
+    if (!target) return;
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
     if (error) return res.status(500).json({ error: error.message });
@@ -200,22 +281,25 @@ app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
 });
 
 // ---------------------------------------------------------------
-// Rates / density / template / station details (admin only)
+// Rates / density / template / station details / subscription.
+// Admin Staff can only touch rate & density fields; everything else
+// (branding, format, template, subscription reminder) is Super Admin
+// only. Fields outside a caller's allowed set are silently ignored
+// rather than erroring, matching how partial saves already work.
 // ---------------------------------------------------------------
+const RATE_FIELDS = ['ms_rate', 'ms_density', 'hsd_rate', 'hsd_density', 'premium_rate', 'premium_density'];
+const SUPER_ADMIN_FIELDS = [
+    'station_name', 'station_address', 'station_phone',
+    'receipt_footer', 'logo_url', 'logo_width_mm',
+    'logo_position_pct', 'logo_ratio_locked', 'logo_height_mm',
+    'receipt_width_cm', 'receipt_margin_mm', 'receipt_line_spacing', 'receipt_base_font_px',
+    'active_template', 'subscription_plan', 'subscription_expiry_date',
+];
+
 app.put('/api/config', requireAdmin, async (req, res) => {
-    const allowedFields = [
-        'station_name', 'station_address', 'station_phone',
-        'receipt_footer', 'logo_url', 'logo_width_mm',
-        'logo_position_pct', 'logo_margin_top_mm', 'logo_margin_bottom_mm',
-        'logo_ratio_locked', 'logo_height_mm',
-        'receipt_width_cm',
-        'receipt_margin_mm', 'receipt_margin_top_mm', 'receipt_line_spacing',
-        'receipt_base_font_px', 'receipt_footer_space_mm',
-        'ms_rate', 'ms_density',
-        'hsd_rate', 'hsd_density',
-        'premium_rate', 'premium_density',
-        'active_template',
-    ];
+    const allowedFields = req.profile.role === 'SUPER_ADMIN'
+        ? [...RATE_FIELDS, ...SUPER_ADMIN_FIELDS]
+        : RATE_FIELDS;
 
     const updates = {};
     for (const field of allowedFields) {
@@ -234,6 +318,77 @@ app.put('/api/config', requireAdmin, async (req, res) => {
     res.json(data);
 });
 
+// ---------------------------------------------------------------
+// Discord integration (Super Admin only). The webhook URL itself is
+// never sent back to the browser after saving — only whether one is
+// configured — since it's a bearer credential (see sql/schema.sql).
+// ---------------------------------------------------------------
+app.get('/api/integrations/discord', requireSuperAdmin, async (req, res) => {
+    const { data, error } = await supabaseAdmin.from('integrations').select('*').eq('id', 1).single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({
+        configured: Boolean(data.discord_webhook_url),
+        enabled: data.discord_enabled,
+        notifyBillCreated: data.discord_notify_bill_created,
+        notifyWeeklySummary: data.discord_notify_weekly_summary,
+        notifyMonthlySummary: data.discord_notify_monthly_summary,
+    });
+});
+
+app.put('/api/integrations/discord', requireSuperAdmin, async (req, res) => {
+    const { webhookUrl, enabled, notifyBillCreated, notifyWeeklySummary, notifyMonthlySummary } = req.body || {};
+
+    const updates = { updated_at: new Date().toISOString() };
+    if (typeof webhookUrl === 'string' && webhookUrl.trim()) {
+        if (!/^https:\/\/(discord|discordapp)\.com\/api\/webhooks\//.test(webhookUrl.trim())) {
+            return res.status(400).json({ error: 'That doesn\'t look like a Discord webhook URL' });
+        }
+        updates.discord_webhook_url = webhookUrl.trim();
+    }
+    if (typeof enabled === 'boolean') updates.discord_enabled = enabled;
+    if (typeof notifyBillCreated === 'boolean') updates.discord_notify_bill_created = notifyBillCreated;
+    if (typeof notifyWeeklySummary === 'boolean') updates.discord_notify_weekly_summary = notifyWeeklySummary;
+    if (typeof notifyMonthlySummary === 'boolean') updates.discord_notify_monthly_summary = notifyMonthlySummary;
+
+    const { error } = await supabaseAdmin.from('integrations').update(updates).eq('id', 1);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ saved: true });
+});
+
+app.post('/api/integrations/discord/test', requireSuperAdmin, async (req, res) => {
+    try {
+        await discord.sendTestMessage();
+        res.json({ sent: true });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// ---------------------------------------------------------------
+// Bill-created notification. Any active logged-in user can call this
+// (station staff create most bills) — the server re-fetches the
+// transaction itself rather than trusting client-supplied amounts, and
+// checks the transaction actually belongs to the caller.
+// ---------------------------------------------------------------
+app.post('/api/notify/bill-created', requireActiveUser, async (req, res) => {
+    const { transactionId } = req.body || {};
+    if (!transactionId) return res.status(400).json({ error: 'transactionId required' });
+
+    const { data: transaction, error } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .eq('id', transactionId)
+        .single();
+
+    if (error || !transaction) return res.status(404).json({ error: 'Transaction not found' });
+    if (transaction.attendant_id !== req.authUser.id) {
+        return res.status(403).json({ error: 'Not your transaction' });
+    }
+
+    discord.notifyBillCreated(transaction).catch((err) => console.error('notifyBillCreated error:', err));
+    res.json({ notified: true });
+});
+
 // Fallback: send everyone through the login gate first.
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -244,4 +399,5 @@ app.listen(PORT, () => {
     console.log(`- Login:   http://localhost:${PORT}/login.html`);
     console.log(`- Billing: http://localhost:${PORT}/billing.html`);
     console.log(`- Admin:   http://localhost:${PORT}/admin.html`);
+    discord.scheduleJobs();
 });

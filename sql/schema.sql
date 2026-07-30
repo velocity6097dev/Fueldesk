@@ -18,14 +18,21 @@
 --    from the browser.
 -- ---------------------------------------------------------
 create table if not exists profiles (
-    id          uuid primary key references auth.users(id) on delete cascade,
-    username    varchar(50) unique not null,
-    role        varchar(20) not null check (role in ('ADMIN_STAFF', 'STATION_STAFF')),
-    is_active   boolean not null default true,
-    created_at  timestamptz not null default now()
+    id            uuid primary key references auth.users(id) on delete cascade,
+    username      varchar(50) unique not null,
+    -- Shown in the app ("Logged in as ...") instead of username, which
+    -- stays as the login handle. Falls back to username if left blank.
+    display_name  varchar(80),
+    -- Three tiers: SUPER_ADMIN sees every adjustment feature (branding,
+    -- format, integrations, staff of any rank). ADMIN_STAFF can only
+    -- set rates/density and manage STATION_STAFF accounts. STATION_STAFF
+    -- only bills. Each rank can only manage ranks below it.
+    role          varchar(20) not null check (role in ('SUPER_ADMIN', 'ADMIN_STAFF', 'STATION_STAFF')),
+    is_active     boolean not null default true,
+    created_at    timestamptz not null default now()
 );
 
--- Helper used inside RLS policies. SECURITY DEFINER so it can read
+-- Helpers used inside RLS policies. SECURITY DEFINER so they can read
 -- profiles even though profiles' own RLS would otherwise block the check.
 create or replace function is_admin(uid uuid)
 returns boolean
@@ -35,7 +42,19 @@ set search_path = public
 as $$
     select exists (
         select 1 from profiles
-        where id = uid and role = 'ADMIN_STAFF' and is_active = true
+        where id = uid and role in ('ADMIN_STAFF', 'SUPER_ADMIN') and is_active = true
+    );
+$$;
+
+create or replace function is_super_admin(uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+    select exists (
+        select 1 from profiles
+        where id = uid and role = 'SUPER_ADMIN' and is_active = true
     );
 $$;
 
@@ -67,7 +86,6 @@ create table if not exists daily_config (
     -- typed there are stored as literal "\n" and reproduced on the receipt.
     station_address   text         not null default '',
     station_phone     varchar(30)  not null default '',
-    station_gstin     varchar(30)  not null default '',
 
     -- Printed at the very bottom of every receipt. Supports "\n" line
     -- breaks and a tiny set of formatting commands (see the (i) button
@@ -82,8 +100,6 @@ create table if not exists daily_config (
     -- 0 = flush left, 50 = centered, 100 = flush right — a continuous
     -- slider position, not a fixed left/center/right choice.
     logo_position_pct   numeric(5,1) not null default 50.0 check (logo_position_pct between 0 and 100),
-    logo_margin_top_mm  numeric(4,1) not null default 0 check (logo_margin_top_mm between 0 and 30),
-    logo_margin_bottom_mm numeric(4,1) not null default 4 check (logo_margin_bottom_mm between 0 and 30),
     -- Locked (default): height always follows width automatically, so the
     -- logo can never look stretched. Unlocked: logo_height_mm also
     -- applies, so width/height can be set independently.
@@ -96,17 +112,12 @@ create table if not exists daily_config (
     receipt_width_cm   numeric(4,1) not null default 5.8 check (receipt_width_cm between 4 and 12),
 
     -- Global formatting, editable live with a preview in the Format
-    -- panel. Applied as a wrapper around whichever template is active
-    -- (see BillTemplates.wrapForOutput in registry.js) — these are NOT
-    -- template-specific, they apply no matter which template you pick.
+    -- panel (Super Admin only). Applied as a wrapper around whichever
+    -- template is active (see BillTemplates.wrapForOutput in
+    -- registry.js) — these are NOT template-specific.
     receipt_margin_mm     numeric(4,1) not null default 3.0 check (receipt_margin_mm between 0 and 15),
-    receipt_margin_top_mm numeric(4,1) not null default 0 check (receipt_margin_top_mm between 0 and 20),
     receipt_line_spacing  numeric(3,2) not null default 1.20 check (receipt_line_spacing between 1.0 and 2.0),
     receipt_base_font_px  numeric(4,1) not null default 11.0 check (receipt_base_font_px between 8 and 16),
-    -- Extra space left after the footer, at the very bottom of the
-    -- receipt — useful for thermal printers that need a bit of blank
-    -- feed before the paper is torn off.
-    receipt_footer_space_mm numeric(4,1) not null default 4.0 check (receipt_footer_space_mm between 0 and 30),
 
     ms_rate           numeric(10,2) not null default 108.97,
     ms_density        numeric(6,1)  not null default 755.0,
@@ -116,6 +127,14 @@ create table if not exists daily_config (
     premium_density   numeric(6,1)  not null default 745.0,
 
     active_template   varchar(50) not null default 'BPCL_TOKHEIM',
+
+    -- Subscription/hosting renewal reminder (Super Admin sets this for
+    -- their own tracking — see server.js/README for how the warning
+    -- banner uses it). Plan is just a label; no prices are ever shown
+    -- anywhere except the Super Admin's own Settings screen.
+    subscription_plan         varchar(10) check (subscription_plan in ('1M', '6M', '12M')),
+    subscription_expiry_date  date,
+
     updated_at        timestamptz not null default now()
 );
 
@@ -133,6 +152,15 @@ create policy "daily_config: any signed-in user can read"
 -- route, which checks the caller is an admin and then writes with the
 -- service role key. This stops a station-staff account (or anyone who
 -- opens dev tools) from changing prices directly through Supabase.
+
+-- Realtime: lets billing.js pick up rate/density changes live (no
+-- reload needed) whenever an admin saves new settings.
+do $$
+begin
+    execute 'alter publication supabase_realtime add table daily_config';
+exception when duplicate_object then
+    null; -- already added, nothing to do
+end $$;
 
 -- ---------------------------------------------------------
 -- 3. transactions
@@ -223,3 +251,35 @@ create policy "station-assets: admins update"
 create policy "station-assets: admins delete"
     on storage.objects for delete
     using (bucket_id = 'station-assets' and is_admin(auth.uid()));
+
+-- ---------------------------------------------------------
+-- 5. Integrations (Discord webhook)
+--    Deliberately has ZERO RLS policies for the "authenticated"
+--    role — not even Super Admin. This table is only ever read
+--    or written by server.js using the service role key. That's
+--    what keeps the webhook URL from being readable by anyone's
+--    browser: a Discord webhook URL is a bearer credential, so if
+--    it were exposed via a normal `select *` query, any logged-in
+--    staff account (or anyone with dev tools) could use it to post
+--    arbitrary messages to your Discord. The Super Admin UI sets
+--    it through a secured server route (PUT /api/integrations/discord)
+--    and only ever gets a "configured: true/false" status back, never
+--    the URL itself.
+-- ---------------------------------------------------------
+create table if not exists integrations (
+    id                              int primary key default 1 check (id = 1),
+    discord_webhook_url             text,
+    discord_enabled                 boolean not null default false,
+    discord_notify_bill_created     boolean not null default true,
+    discord_notify_weekly_summary   boolean not null default true,
+    discord_notify_monthly_summary  boolean not null default true,
+    updated_at                      timestamptz not null default now()
+);
+
+insert into integrations (id) values (1)
+    on conflict (id) do nothing;
+
+alter table integrations enable row level security;
+-- No policies at all: RLS enabled with zero policies means access is
+-- denied by default for every role except the service role, which
+-- bypasses RLS entirely. This is intentional.

@@ -1,21 +1,28 @@
-const ROLE_OPTIONS = [
-    { value: 'STATION_STAFF', label: 'Station Staff' },
-    { value: 'ADMIN_STAFF', label: 'Admin Staff' },
-];
+const ROLE_OPTIONS_BY_RANK = {
+    SUPER_ADMIN: [
+        { value: 'STATION_STAFF', label: 'Station Staff' },
+        { value: 'ADMIN_STAFF', label: 'Admin Staff' },
+        { value: 'SUPER_ADMIN', label: 'Super Admin' },
+    ],
+    ADMIN_STAFF: [
+        { value: 'STATION_STAFF', label: 'Station Staff' },
+    ],
+};
+
+const ROLE_TAGS = {
+    SUPER_ADMIN: '<span class="tag tag-admin">Super Admin</span>',
+    ADMIN_STAFF: '<span class="tag tag-admin">Admin</span>',
+    STATION_STAFF: '<span class="tag tag-staff">Staff</span>',
+};
 
 const whoami = document.getElementById('whoami');
+const staffDisplayNameInput = document.getElementById('new-staff-display-name');
 const staffUsernameInput = document.getElementById('new-staff-username');
 const staffPinInput = document.getElementById('new-staff-pin');
 const addStaffBtn = document.getElementById('add-staff-btn');
 const staffListEl = document.getElementById('staff-list');
 
-const rolePicker = makePickerField({
-    buttonEl: document.getElementById('role-picker-btn'),
-    labelEl: document.getElementById('role-picker-label'),
-    title: 'Staff Role',
-    options: ROLE_OPTIONS,
-    initialValue: 'STATION_STAFF',
-});
+let rolePicker = null;
 
 document.getElementById('back-btn').addEventListener('click', () => window.location.href = '/admin.html');
 
@@ -28,17 +35,16 @@ async function authHeaders() {
 }
 
 function staffRowHtml(member, currentUserId) {
-    const roleTag = member.role === 'ADMIN_STAFF'
-        ? '<span class="tag tag-admin">Admin</span>'
-        : '<span class="tag tag-staff">Staff</span>';
+    const roleTag = ROLE_TAGS[member.role] || '';
     const inactiveTag = member.is_active ? '' : '<span class="tag tag-inactive">Inactive</span>';
     const isSelf = member.id === currentUserId;
+    const name = member.display_name || member.username;
 
     return `
         <div class="manage-item staff-item fade-in" data-id="${member.id}">
             <div class="staff-main">
-                <div class="staff-name">${member.username}${roleTag}${inactiveTag}</div>
-                <div class="staff-meta">Added ${new Date(member.created_at).toLocaleDateString()}</div>
+                <div class="staff-name">${name}${roleTag}${inactiveTag}</div>
+                <div class="staff-meta">@${member.username} · Added ${new Date(member.created_at).toLocaleDateString()}</div>
             </div>
             <div class="staff-actions">
                 ${isSelf ? '' : `
@@ -121,6 +127,7 @@ async function deleteStaff(id) {
 }
 
 addStaffBtn.addEventListener('click', async () => {
+    const displayName = staffDisplayNameInput.value.trim();
     const username = staffUsernameInput.value.trim();
     const password = staffPinInput.value;
     const role = rolePicker.get();
@@ -135,14 +142,15 @@ addStaffBtn.addEventListener('click', async () => {
         const res = await fetch('/api/staff', {
             method: 'POST',
             headers: await authHeaders(),
-            body: JSON.stringify({ username, password, role }),
+            body: JSON.stringify({ display_name: displayName, username, password, role }),
         });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || 'Could not create staff');
 
+        staffDisplayNameInput.value = '';
         staffUsernameInput.value = '';
         staffPinInput.value = '';
-        Toast.show(`${username} added.`);
+        Toast.show(`${displayName || username} added.`);
         staffListEl.innerHTML = staffSkeletonHtml();
         await loadStaff();
     } catch (err) {
@@ -154,10 +162,20 @@ addStaffBtn.addEventListener('click', async () => {
 });
 
 (async function init() {
-    const profile = await FuelDeskAuth.requireSession('ADMIN_STAFF');
+    const profile = await FuelDeskAuth.requireSession(['SUPER_ADMIN', 'ADMIN_STAFF']);
     if (!profile) return;
 
-    whoami.textContent = `Logged in as ${profile.username}`;
+    whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
+
+    const roleOptions = ROLE_OPTIONS_BY_RANK[profile.role] || ROLE_OPTIONS_BY_RANK.ADMIN_STAFF;
+    rolePicker = makePickerField({
+        buttonEl: document.getElementById('role-picker-btn'),
+        labelEl: document.getElementById('role-picker-label'),
+        title: 'Staff Role',
+        options: roleOptions,
+        initialValue: 'STATION_STAFF',
+    });
+
     FuelDeskAuth.renderPanelSwitcher('admin'); // Staff lives under the Settings tab conceptually
     await loadStaff();
 })();

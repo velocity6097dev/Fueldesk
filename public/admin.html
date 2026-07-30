@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FuelDesk — Settings</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link rel="icon" type="image/x-icon" href="/resources/favicon.ico">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -20,76 +19,104 @@
                 <button type="button" class="topbar-icon-btn" id="staff-nav-btn" aria-label="Manage staff">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 </button>
-                <span class="role-badge">Admin</span>
+                <span class="role-badge" id="role-badge">Admin</span>
                 <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
             </div>
         </div>
 
         <div class="app-main">
 
-            <!-- Station details -->
-            <div class="settings-block">
-                <div class="block-title">Station Details</div>
-                <label class="field">
-                    <span class="field-label-row">
-                        Station Name
-                        <button type="button" class="info-btn" id="name-info-btn">i</button>
-                    </span>
-                    <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
-                </label>
-                <label class="field" style="margin-top:14px;">
-                    <span class="field-label-row">
-                        Address
-                        <button type="button" class="info-btn" id="address-info-btn">i</button>
-                    </span>
-                    <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;<center>State - PIN</center>"></textarea>
-                </label>
-                <div class="hint" style="margin-top:6px;">Left-aligned by default. Tap the <b>i</b> above for centering / bold commands.</div>
-                <label class="field" style="margin-top:14px;">
-                    <span>Phone</span>
-                    <input type="text" id="station-phone" placeholder="98XXXXXXXX">
-                </label>
-            </div>
+            <!-- Everything in this section is Super Admin only — Admin Staff never sees it. -->
+            <div id="super-admin-section">
 
-            <!-- Receipt branding -->
-            <div class="settings-block">
-                <div class="block-title">Receipt Branding</div>
+                <div class="settings-block">
+                    <div class="block-title">Station Details</div>
+                    <label class="field">
+                        <span class="field-label-row">
+                            Station Name
+                            <button type="button" class="info-btn" id="name-info-btn">i</button>
+                        </span>
+                        <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
+                    </label>
+                    <label class="field" style="margin-top:14px;">
+                        <span class="field-label-row">
+                            Address
+                            <button type="button" class="info-btn" id="address-info-btn">i</button>
+                        </span>
+                        <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;<center>State - PIN</center>"></textarea>
+                    </label>
+                    <div class="hint" style="margin-top:6px;">Left-aligned by default. Tap the <b>i</b> above for centering / bold commands.</div>
+                    <label class="field" style="margin-top:14px;">
+                        <span>Phone</span>
+                        <input type="text" id="station-phone" placeholder="98XXXXXXXX">
+                    </label>
+                </div>
 
-                <div class="field">
-                    <span>Logo</span>
-                    <div class="photo-upload-row">
-                        <div class="photo-preview" id="logo-preview">No logo</div>
-                        <div class="photo-upload-actions">
-                            <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Upload Photo</button>
-                            <button type="button" class="btn-danger-text btn btn-sm" id="logo-remove-btn" style="display:none;">Remove Logo</button>
-                            <input type="file" id="logo-file-input" accept="image/*">
+                <div class="settings-block">
+                    <div class="block-title">Receipt Branding</div>
+
+                    <div class="field">
+                        <span>Logo</span>
+                        <div class="photo-upload-row">
+                            <div class="photo-preview" id="logo-preview">No logo</div>
+                            <div class="photo-upload-actions">
+                                <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Upload Photo</button>
+                                <button type="button" class="btn-danger-text btn btn-sm" id="logo-remove-btn" style="display:none;">Remove Logo</button>
+                                <input type="file" id="logo-file-input" accept="image/*">
+                            </div>
                         </div>
+                        <div class="hint" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
                     </div>
-                    <div class="hint" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
+
+                    <label class="field" style="margin-top:14px;">
+                        <span class="field-label-row">
+                            Receipt Footer
+                            <button type="button" class="info-btn" id="footer-info-btn">i</button>
+                        </span>
+                        <textarea id="receipt-footer" rows="2" placeholder="<center>Thank You! Please Visit Again..</center>"></textarea>
+                    </label>
+
+                    <div class="field" style="margin-top:14px;">
+                        <span>Receipt Template</span>
+                        <button type="button" class="picker-btn" id="template-picker-btn">
+                            <span id="template-picker-label"></span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                    </div>
+
+                    <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
+                    <div class="hint" style="margin-top:8px;">FP ID and nozzle number are generated automatically and vary on every bill — no setup needed.</div>
+                    <button type="button" class="btn btn-primary btn-block" id="format-panel-btn" style="margin-top:14px;">Open Format Panel — Sizing, Position &amp; Spacing</button>
                 </div>
 
-                <label class="field" style="margin-top:14px;">
-                    <span class="field-label-row">
-                        Receipt Footer
-                        <button type="button" class="info-btn" id="footer-info-btn">i</button>
-                    </span>
-                    <textarea id="receipt-footer" rows="2" placeholder="<center>Thank You! Please Visit Again..</center>"></textarea>
-                </label>
-
-                <div class="field" style="margin-top:14px;">
-                    <span>Receipt Template</span>
-                    <button type="button" class="picker-btn" id="template-picker-btn">
-                        <span id="template-picker-label"></span>
-                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
+                <div class="settings-block">
+                    <div class="block-title">Integrations</div>
+                    <div class="block-sub">Discord notifications for new bills and weekly/monthly summaries.</div>
+                    <button type="button" class="btn btn-ghost btn-block" id="integrations-btn" style="margin-top:14px;">Open Integrations</button>
                 </div>
 
-                <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
-                <div class="hint" style="margin-top:8px;">FP ID and nozzle number are generated automatically and vary on every bill — no setup needed.</div>
-                <button type="button" class="btn btn-primary btn-block" id="format-panel-btn" style="margin-top:14px;">Open Format Panel — Sizing, Position &amp; Spacing</button>
+                <div class="settings-block">
+                    <div class="block-title">Hosting Subscription</div>
+                    <div class="block-sub">For your own tracking — this is what the renewal reminder banner is based on.</div>
+                    <div class="field" style="margin-top:10px;">
+                        <span>Plan</span>
+                        <button type="button" class="picker-btn" id="plan-picker-btn">
+                            <span id="plan-picker-label"></span>
+                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                    </div>
+                    <label class="field" style="margin-top:14px;">
+                        <span>Renewal / Expiry Date</span>
+                        <input type="date" id="subscription-expiry">
+                    </label>
+                    <div class="settings-actions">
+                        <button type="button" id="save-subscription-btn" class="btn btn-ghost btn-block">Save Subscription Info</button>
+                    </div>
+                </div>
+
             </div>
 
-            <!-- Rates & density -->
+            <!-- Rates & density — visible to both Admin and Super Admin -->
             <div class="settings-block">
                 <div class="block-title">Daily Rates &amp; Density</div>
 

@@ -99,7 +99,27 @@ function waitForReceiptImages(container, timeoutMs = 2500) {
     ]);
 }
 
-// Injects/updates a <style> tag that sets the printed receipt's paper
+// Shows a hosting-renewal reminder banner at the top of the page if the
+// subscription expiry date is within 5 days (or already past). Never
+// shows amounts or plan details — just a prompt to contact the
+// developer. Pass the raw `subscription_expiry_date` string from
+// daily_config (or null/undefined, in which case nothing renders).
+function renderSubscriptionBanner(expiryDateStr) {
+    if (!expiryDateStr) return;
+
+    const expiry = new Date(`${expiryDateStr}T23:59:59`);
+    if (isNaN(expiry.getTime())) return;
+
+    const daysLeft = Math.ceil((expiry - new Date()) / (24 * 60 * 60 * 1000));
+    if (daysLeft > 5) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'subscription-banner';
+    banner.textContent = daysLeft < 0
+        ? '⚠️ Hosting renewal is overdue — please confirm payment with the developer to keep the service running.'
+        : `⚠️ Hosting renewal due in ${daysLeft} day${daysLeft === 1 ? '' : 's'} — please confirm payment with the developer to renew.`;
+    document.body.insertBefore(banner, document.body.firstChild);
+}
 // width (in cm). Call this before window.print() so @page picks it up.
 // Falls back to the 58mm default in style.css if never called.
 function applyReceiptWidth(widthCm) {

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FuelDesk — Staff</title>
     <link rel="stylesheet" href="/css/style.css">
-    <link rel="icon" type="image/x-icon" href="/resources/favicon.ico">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -31,6 +30,10 @@
             <div class="settings-block">
                 <div class="block-title">Add Staff</div>
                 <label class="field">
+                    <span>Display Name</span>
+                    <input type="text" id="new-staff-display-name" placeholder="e.g. Rahul Kumar (shown when logged in)">
+                </label>
+                <label class="field" style="margin-top:14px;">
                     <span>Username</span>
                     <input type="text" id="new-staff-username" placeholder="e.g. staff_rahul" autocapitalize="off">
                 </label>

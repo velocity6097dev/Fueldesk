@@ -13,10 +13,6 @@ const logoRatioLock = document.getElementById('logo-ratio-lock');
 const logoHeightField = document.getElementById('logo-height-field');
 const logoHeightSlider = document.getElementById('logo-height');
 const logoHeightValue = document.getElementById('logo-height-value');
-const logoMarginTopSlider = document.getElementById('logo-margin-top');
-const logoMarginTopValue = document.getElementById('logo-margin-top-value');
-const logoMarginBottomSlider = document.getElementById('logo-margin-bottom');
-const logoMarginBottomValue = document.getElementById('logo-margin-bottom-value');
 
 // ---- Paper ----
 const paperWidthSegmented = document.getElementById('paper-width-segmented');
@@ -24,10 +20,6 @@ const paperWidthSegmented = document.getElementById('paper-width-segmented');
 // ---- Margins & spacing ----
 const marginSideSlider = document.getElementById('margin-side');
 const marginSideValue = document.getElementById('margin-side-value');
-const marginTopSlider = document.getElementById('margin-top');
-const marginTopValue = document.getElementById('margin-top-value');
-const footerSpaceSlider = document.getElementById('footer-space');
-const footerSpaceValue = document.getElementById('footer-space-value');
 const lineSpacingSlider = document.getElementById('line-spacing');
 const lineSpacingValue = document.getElementById('line-spacing-value');
 const baseFontSlider = document.getElementById('base-font');
@@ -73,8 +65,6 @@ function sampleData() {
             logoUrl: stationConfig?.logo_url || null,
             logoWidthMm: Number(logoWidthSlider.value),
             logoPositionPct: Number(logoPositionSlider.value),
-            logoMarginTopMm: Number(logoMarginTopSlider.value),
-            logoMarginBottomMm: Number(logoMarginBottomSlider.value),
             logoRatioLocked: logoRatioLock.checked,
             logoHeightMm: Number(logoHeightSlider.value),
         },
@@ -93,7 +83,7 @@ function sampleData() {
         timeStr: '12:00',
         printDateStr: '01/01/26',
         printTimeStr: '12:00',
-        attendantUsername: window.currentProfile?.username || 'staff_demo',
+        attendantUsername: FuelDeskAuth.displayName(window.currentProfile) || 'staff_demo',
         vehicleNo: 'MH12AB1234',
         mobileNo: '9876543210',
     };
@@ -106,10 +96,8 @@ function renderPreview() {
     receiptEl.style.width = `${paperWidthCm}cm`;
     receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: Number(marginSideSlider.value),
-        marginTopMm: Number(marginTopSlider.value),
         lineSpacing: Number(lineSpacingSlider.value),
         baseFontPx: Number(baseFontSlider.value),
-        footerSpaceMm: Number(footerSpaceSlider.value),
     });
 }
 
@@ -122,11 +110,7 @@ function wireLiveSlider(slider, valueEl, format) {
 
 wireLiveSlider(logoWidthSlider, logoWidthValue, (v) => `${v}mm`);
 wireLiveSlider(logoHeightSlider, logoHeightValue, (v) => `${v}mm`);
-wireLiveSlider(logoMarginTopSlider, logoMarginTopValue, (v) => `${v}mm`);
-wireLiveSlider(logoMarginBottomSlider, logoMarginBottomValue, (v) => `${v}mm`);
 wireLiveSlider(marginSideSlider, marginSideValue, (v) => `${v}mm`);
-wireLiveSlider(marginTopSlider, marginTopValue, (v) => `${v}mm`);
-wireLiveSlider(footerSpaceSlider, footerSpaceValue, (v) => `${v}mm`);
 wireLiveSlider(lineSpacingSlider, lineSpacingValue, (v) => Number(v).toFixed(2));
 wireLiveSlider(baseFontSlider, baseFontValue, (v) => `${v}px`);
 
@@ -169,14 +153,10 @@ saveFormatBtn.addEventListener('click', async () => {
             logo_width_mm: Number(logoWidthSlider.value),
             logo_ratio_locked: logoRatioLock.checked,
             logo_height_mm: Number(logoHeightSlider.value),
-            logo_margin_top_mm: Number(logoMarginTopSlider.value),
-            logo_margin_bottom_mm: Number(logoMarginBottomSlider.value),
             receipt_width_cm: paperWidthCm,
             receipt_margin_mm: Number(marginSideSlider.value),
-            receipt_margin_top_mm: Number(marginTopSlider.value),
             receipt_line_spacing: Number(lineSpacingSlider.value),
             receipt_base_font_px: Number(baseFontSlider.value),
-            receipt_footer_space_mm: Number(footerSpaceSlider.value),
         });
         Toast.show('Format saved — every bill will use this from now on.');
     } catch (err) {
@@ -207,11 +187,6 @@ async function loadConfig() {
     logoHeightSlider.value = data.logo_height_mm ?? 20;
     logoHeightValue.textContent = `${logoHeightSlider.value}mm`;
 
-    logoMarginTopSlider.value = data.logo_margin_top_mm ?? 0;
-    logoMarginTopValue.textContent = `${logoMarginTopSlider.value}mm`;
-    logoMarginBottomSlider.value = data.logo_margin_bottom_mm ?? 4;
-    logoMarginBottomValue.textContent = `${logoMarginBottomSlider.value}mm`;
-
     paperWidthCm = Number(data.receipt_width_cm ?? 5.8);
     paperWidthSegmented.querySelectorAll('button').forEach((b) => {
         b.classList.toggle('active', Math.abs(Number(b.dataset.cm) - paperWidthCm) < 0.05);
@@ -219,10 +194,6 @@ async function loadConfig() {
 
     marginSideSlider.value = data.receipt_margin_mm ?? 3;
     marginSideValue.textContent = `${marginSideSlider.value}mm`;
-    marginTopSlider.value = data.receipt_margin_top_mm ?? 0;
-    marginTopValue.textContent = `${marginTopSlider.value}mm`;
-    footerSpaceSlider.value = data.receipt_footer_space_mm ?? 4;
-    footerSpaceValue.textContent = `${footerSpaceSlider.value}mm`;
     lineSpacingSlider.value = data.receipt_line_spacing ?? 1.2;
     lineSpacingValue.textContent = Number(lineSpacingSlider.value).toFixed(2);
     baseFontSlider.value = data.receipt_base_font_px ?? 11;
@@ -233,7 +204,7 @@ async function loadConfig() {
 }
 
 (async function init() {
-    const profile = await FuelDeskAuth.requireSession('ADMIN_STAFF');
+    const profile = await FuelDeskAuth.requireSession('SUPER_ADMIN');
     if (!profile) return;
 
     const options = window.BillTemplates.list().map((t) => ({ value: t.id, label: t.label }));

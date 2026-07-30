@@ -1,18 +1,22 @@
 // Run once, from the project root:
-//   node scripts/create-first-admin.js <username> <password>
+//   node scripts/create-first-admin.js <username> <password> [display name]
 //
-// Creates the very first ADMIN_STAFF login directly with the service
-// role key. After this, use the Admin screen in the app to add more
-// staff (admins or station staff) — you won't need this script again.
+// Creates the very first SUPER_ADMIN login directly with the service
+// role key. Super Admin is the top rank — it sees every adjustment
+// feature (branding, Format panel, Integrations, staff of any rank).
+// After this, use the Staff page in the app to add Admin Staff (rates/
+// density + Station Staff management only) and Station Staff — you
+// won't need this script again.
 
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const [, , username, password] = process.argv;
+const [, , username, password, ...displayNameParts] = process.argv;
+const displayName = displayNameParts.join(' ').trim() || null;
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AUTH_EMAIL_DOMAIN = 'station.local' } = process.env;
 
 if (!username || !password) {
-    console.error('Usage: node scripts/create-first-admin.js <username> <password>');
+    console.error('Usage: node scripts/create-first-admin.js <username> <password> [display name]');
     process.exit(1);
 }
 if (password.length < 6) {
@@ -45,7 +49,8 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     const { error: profileError } = await supabaseAdmin.from('profiles').insert([{
         id: created.user.id,
         username: username.trim().toLowerCase(),
-        role: 'ADMIN_STAFF',
+        display_name: displayName,
+        role: 'SUPER_ADMIN',
         is_active: true,
     }]);
 
@@ -55,7 +60,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
         process.exit(1);
     }
 
-    console.log(`\n✅ Admin account created. Log in at /login.html with:`);
+    console.log(`\n✅ Super Admin account created. Log in at /login.html with:`);
     console.log(`   username: ${username.trim().toLowerCase()}`);
     console.log(`   password: (what you just typed)\n`);
     process.exit(0);

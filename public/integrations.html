@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FuelDesk — Integrations</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <div class="app-screen">
+        <div class="app-topbar">
+            <div class="topbar-text" style="display:flex;align-items:center;gap:10px;">
+                <button type="button" class="topbar-icon-btn" id="back-btn" aria-label="Back">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div>
+                    <strong>Integrations</strong>
+                    <div class="topbar-sub" id="whoami">&nbsp;</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
+            </div>
+        </div>
+
+        <div class="app-main">
+
+            <div class="settings-block">
+                <div class="block-title">
+                    Discord
+                    <span class="tag" id="discord-status-tag">Loading…</span>
+                </div>
+                <div class="block-sub">Post bill and summary notifications to a Discord channel via webhook.</div>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Webhook URL</span>
+                    <input type="text" id="webhook-url" placeholder="https://discord.com/api/webhooks/...">
+                    <div class="hint" style="margin-top:6px;" id="webhook-hint">Leave blank to keep the currently saved URL — it's never shown back here once saved, since anyone with it can post to your channel.</div>
+                </label>
+
+                <div class="field" style="margin-top:14px;">
+                    <span class="field-label-row" style="text-transform:none;font-size:13px;font-weight:600;color:var(--ink);">
+                        <input type="checkbox" id="discord-enabled" style="width:auto;">
+                        Enable Discord notifications
+                    </span>
+                </div>
+
+                <div class="field" style="margin-top:14px;">
+                    <span class="field-label-row" style="text-transform:none;font-size:13px;font-weight:600;color:var(--ink);">
+                        <input type="checkbox" id="notify-bill-created" style="width:auto;">
+                        Notify on every bill created
+                    </span>
+                </div>
+                <div class="field" style="margin-top:10px;">
+                    <span class="field-label-row" style="text-transform:none;font-size:13px;font-weight:600;color:var(--ink);">
+                        <input type="checkbox" id="notify-weekly" style="width:auto;">
+                        Weekly summary (all staff, every Monday)
+                    </span>
+                </div>
+                <div class="field" style="margin-top:10px;">
+                    <span class="field-label-row" style="text-transform:none;font-size:13px;font-weight:600;color:var(--ink);">
+                        <input type="checkbox" id="notify-monthly" style="width:auto;">
+                        Monthly summary (all staff, 1st of month)
+                    </span>
+                </div>
+
+                <div class="settings-actions">
+                    <button type="button" id="save-discord-btn" class="btn btn-primary btn-block">Save</button>
+                </div>
+                <button type="button" id="test-discord-btn" class="btn btn-ghost btn-block" style="margin-top:10px;">Send Test Message</button>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Data Retention</div>
+                <div class="block-sub">Transactions older than 1 month are deleted automatically every night — this isn't configurable here, it's a fixed background job (see <code>discord.js</code> on the server).</div>
+            </div>
+
+            <div class="app-footer-brand"><span class="bolt">&#9889;</span> Made by Velocity.logs</div>
+        </div>
+    </div>
+
+    <script src="/env.js"></script>
+    <script src="/js/supabaseClient.js"></script>
+    <script src="/js/authGuard.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/integrations.js"></script>
+</body>
+</html>

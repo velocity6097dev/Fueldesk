@@ -1,6 +1,13 @@
 const TEMPLATE_OPTIONS_FALLBACK = []; // populated from window.BillTemplates.list()
+const PLAN_OPTIONS = [
+    { value: '1M', label: '1 Month — ₹250' },
+    { value: '6M', label: '6 Months — ₹1350' },
+    { value: '12M', label: '12 Months — ₹2500' },
+];
 
 const whoami = document.getElementById('whoami');
+const roleBadge = document.getElementById('role-badge');
+const superAdminSection = document.getElementById('super-admin-section');
 
 const stationNameInput = document.getElementById('station-name');
 const stationAddressInput = document.getElementById('station-address');
@@ -13,6 +20,9 @@ const logoRemoveBtn = document.getElementById('logo-remove-btn');
 const logoFileInput = document.getElementById('logo-file-input');
 const previewReceiptBtn = document.getElementById('preview-receipt-btn');
 
+const subscriptionExpiryInput = document.getElementById('subscription-expiry');
+const saveSubscriptionBtn = document.getElementById('save-subscription-btn');
+
 const msRateInput = document.getElementById('ms-rate');
 const msDensityInput = document.getElementById('ms-density');
 const hsdRateInput = document.getElementById('hsd-rate');
@@ -23,7 +33,7 @@ const premiumDensityInput = document.getElementById('premium-density');
 const saveConfigBtn = document.getElementById('save-config-btn');
 
 let currentLogoUrl = null;
-let currentConfig = null; // full loaded row — logo position/size/lock, margins, etc. now live only in the Format panel, but Preview here needs to read them
+let currentConfig = null; // full loaded row — logo position/size/lock, etc. now live in Format, but Preview here needs to read them
 
 const templatePicker = makePickerField({
     buttonEl: document.getElementById('template-picker-btn'),
@@ -33,12 +43,21 @@ const templatePicker = makePickerField({
     initialValue: 'BPCL_TOKHEIM',
 });
 
+const planPicker = makePickerField({
+    buttonEl: document.getElementById('plan-picker-btn'),
+    labelEl: document.getElementById('plan-picker-label'),
+    title: 'Hosting Plan',
+    options: PLAN_OPTIONS,
+    initialValue: '1M',
+});
+
 wireCommandsInfoButton(document.getElementById('name-info-btn'), 'Station Name');
 wireCommandsInfoButton(document.getElementById('address-info-btn'), 'Station Address');
 wireCommandsInfoButton(document.getElementById('footer-info-btn'), 'Receipt Footer');
 
 document.getElementById('staff-nav-btn').addEventListener('click', () => window.location.href = '/staff.html');
 document.getElementById('format-panel-btn').addEventListener('click', () => window.location.href = '/format.html');
+document.getElementById('integrations-btn').addEventListener('click', () => window.location.href = '/integrations.html');
 
 async function authHeaders() {
     const { data: { session } } = await window.sb.auth.getSession();
@@ -49,8 +68,8 @@ async function authHeaders() {
 }
 
 // Sends only the given fields — /api/config only touches keys present in
-// the body, so this is safe to call for a quick partial save (e.g. just
-// the logo) without clobbering the rest of daily_config.
+// the body (and only ones the caller's role is allowed to touch), so
+// this is safe for a quick partial save.
 async function patchConfig(fields) {
     const res = await fetch('/api/config', {
         method: 'PUT',
@@ -138,6 +157,9 @@ async function loadConfig() {
     currentLogoUrl = data.logo_url || null;
     renderLogoPreview(currentLogoUrl);
 
+    planPicker.set(data.subscription_plan || '1M');
+    subscriptionExpiryInput.value = data.subscription_expiry_date || '';
+
     msRateInput.value = data.ms_rate;
     msDensityInput.value = data.ms_density;
     hsdRateInput.value = data.hsd_rate;
@@ -177,6 +199,23 @@ saveConfigBtn.addEventListener('click', async () => {
     }
 });
 
+saveSubscriptionBtn.addEventListener('click', async () => {
+    saveSubscriptionBtn.disabled = true;
+    saveSubscriptionBtn.textContent = 'Saving...';
+    try {
+        await patchConfig({
+            subscription_plan: planPicker.get(),
+            subscription_expiry_date: subscriptionExpiryInput.value || null,
+        });
+        Toast.show('Subscription info saved.');
+    } catch (err) {
+        Toast.show(err.message, { error: true, duration: 5000 });
+    } finally {
+        saveSubscriptionBtn.disabled = false;
+        saveSubscriptionBtn.textContent = 'Save Subscription Info';
+    }
+});
+
 previewReceiptBtn.addEventListener('click', async () => {
     const template = window.BillTemplates.get(templatePicker.get());
     applyReceiptWidth(currentConfig?.receipt_width_cm ?? 5.8);
@@ -188,8 +227,6 @@ previewReceiptBtn.addEventListener('click', async () => {
             logoUrl: currentLogoUrl,
             logoWidthMm: currentConfig?.logo_width_mm,
             logoPositionPct: currentConfig?.logo_position_pct,
-            logoMarginTopMm: currentConfig?.logo_margin_top_mm,
-            logoMarginBottomMm: currentConfig?.logo_margin_bottom_mm,
             logoRatioLocked: currentConfig?.logo_ratio_locked,
             logoHeightMm: currentConfig?.logo_height_mm,
         },
@@ -208,7 +245,7 @@ previewReceiptBtn.addEventListener('click', async () => {
         timeStr: '12:00',
         printDateStr: '01/01/26',
         printTimeStr: '12:00',
-        attendantUsername: window.currentProfile.username,
+        attendantUsername: FuelDeskAuth.displayName(window.currentProfile),
         vehicleNo: 'MH12AB1234',
         mobileNo: '9876543210',
     });
@@ -216,20 +253,23 @@ previewReceiptBtn.addEventListener('click', async () => {
     const receiptEl = document.getElementById('thermal-receipt');
     receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: currentConfig?.receipt_margin_mm,
-        marginTopMm: currentConfig?.receipt_margin_top_mm,
         lineSpacing: currentConfig?.receipt_line_spacing,
         baseFontPx: currentConfig?.receipt_base_font_px,
-        footerSpaceMm: currentConfig?.receipt_footer_space_mm,
     });
     await waitForReceiptImages(receiptEl);
     window.print();
 });
 
 (async function init() {
-    const profile = await FuelDeskAuth.requireSession('ADMIN_STAFF');
+    const profile = await FuelDeskAuth.requireSession(['SUPER_ADMIN', 'ADMIN_STAFF']);
     if (!profile) return;
 
-    whoami.textContent = `Logged in as ${profile.username}`;
+    whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
+    roleBadge.textContent = FuelDeskAuth.roleLabel(profile.role);
+
+    if (profile.role !== 'SUPER_ADMIN') {
+        superAdminSection.style.display = 'none';
+    }
 
     // The template picker was created with an empty option list (templates
     // register themselves as their <script> tags load); fill it in now.

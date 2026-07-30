@@ -2,14 +2,23 @@
 //
 // Usage at the top of a protected page's script:
 //
-//   const profile = await FuelDeskAuth.requireSession('ADMIN_STAFF');
+//   const profile = await FuelDeskAuth.requireSession('SUPER_ADMIN');
+//   // or a list of roles: requireSession(['SUPER_ADMIN', 'ADMIN_STAFF'])
+//   // or no argument at all: any active, logged-in user
 //   // profile is null if the guard already redirected away — bail out.
 //   if (!profile) return;
 
 window.FuelDeskAuth = (function () {
     const HOME_BY_ROLE = {
+        SUPER_ADMIN: '/billing.html',
         ADMIN_STAFF: '/billing.html',
         STATION_STAFF: '/billing.html',
+    };
+
+    const ROLE_LABELS = {
+        SUPER_ADMIN: 'Super Admin',
+        ADMIN_STAFF: 'Admin',
+        STATION_STAFF: 'Staff',
     };
 
     const MAX_SESSION_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -18,6 +27,14 @@ window.FuelDeskAuth = (function () {
     function goToLogin(message) {
         const q = message ? `?msg=${encodeURIComponent(message)}` : '';
         window.location.replace(`/login.html${q}`);
+    }
+
+    function roleLabel(role) {
+        return ROLE_LABELS[role] || role;
+    }
+
+    function displayName(profile) {
+        return profile?.display_name || profile?.username || '';
     }
 
     // Forces a fresh login every 12 hours, regardless of "Remember Me" —
@@ -41,7 +58,11 @@ window.FuelDeskAuth = (function () {
         return true;
     }
 
-    async function requireSession(requiredRole) {
+    // requiredRoles: undefined/null (any active user), a role string, or
+    // an array of role strings.
+    async function requireSession(requiredRoles) {
+        const allowed = requiredRoles ? [].concat(requiredRoles) : null;
+
         const { data: { session }, error: sessionError } = await window.sb.auth.getSession();
 
         if (sessionError || !session) {
@@ -69,7 +90,7 @@ window.FuelDeskAuth = (function () {
             return null;
         }
 
-        if (requiredRole && profile.role !== requiredRole) {
+        if (allowed && !allowed.includes(profile.role)) {
             // Logged in, just on the wrong screen for their role — send them home
             // instead of showing an error, since this is a normal thing to happen
             // (e.g. a staff member bookmarked the admin page).
@@ -93,11 +114,12 @@ window.FuelDeskAuth = (function () {
         });
     }
 
-    // Only admins get this — it's how they hop between the Billing and
-    // Admin panels without logging out. Station staff never see it,
-    // since they only ever have access to Billing.
+    // Both admin tiers get this — it's how they hop between Billing and
+    // Settings without logging out. Station staff never see it, since
+    // they only ever have access to Billing.
     function renderPanelSwitcher(activePage) {
-        if (!window.currentProfile || window.currentProfile.role !== 'ADMIN_STAFF') return;
+        const role = window.currentProfile?.role;
+        if (role !== 'SUPER_ADMIN' && role !== 'ADMIN_STAFF') return;
 
         const nav = document.createElement('div');
         nav.className = 'bottom-nav';
@@ -117,5 +139,5 @@ window.FuelDeskAuth = (function () {
         document.body.appendChild(nav);
     }
 
-    return { requireSession, renderPanelSwitcher };
+    return { requireSession, renderPanelSwitcher, roleLabel, displayName };
 })();

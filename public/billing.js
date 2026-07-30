@@ -32,7 +32,7 @@ const productPicker = makePickerField({
     labelEl: document.getElementById('product-picker-label'),
     title: 'Select Product',
     options: PRODUCT_OPTIONS,
-    initialValue: 'HSD',
+    initialValue: 'MS',
 });
 document.getElementById('product-picker-btn').addEventListener('picker-change', updateLiveStats);
 
@@ -41,7 +41,7 @@ const modePicker = makePickerField({
     labelEl: document.getElementById('mode-picker-label'),
     title: 'Select Billing Mode',
     options: MODE_OPTIONS,
-    initialValue: 'AMOUNT',
+    initialValue: 'VOLUME',
 });
 document.getElementById('mode-picker-btn').addEventListener('picker-change', updateInputLabel);
 
@@ -89,39 +89,44 @@ function defaultDatetimeLocalValue() {
     return d.toISOString().slice(0, 16);
 }
 
-const CONFIG_CACHE_KEY = 'fueldesk:dailyConfig';
-
-function readCachedConfig() {
-    try {
-        const raw = sessionStorage.getItem(CONFIG_CACHE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
+function setPrintButtonLoading(isLoading) {
+    printBtn.disabled = isLoading;
+    printBtn.textContent = isLoading ? 'Loading rates...' : 'Print Bill';
 }
 
-function writeCachedConfig(data) {
-    try { sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(data)); } catch { /* ignore quota errors */ }
-}
-
+// Rates/density are always fetched fresh — no stale-cache shortcut.
+// Billing is blocked (Print stays disabled) until this succeeds, so
+// nobody can accidentally bill against out-of-date numbers.
 async function loadConfig() {
-    // Show a cached value instantly (if we have one from earlier this
-    // session) so the rate/density aren't blank while the network call
-    // is in flight, then quietly refresh with the real thing.
-    const cached = readCachedConfig();
-    if (cached) {
-        currentConfig = cached;
-        updateLiveStats();
-    }
+    setPrintButtonLoading(true);
 
     const { data, error } = await window.sb.from('daily_config').select('*').eq('id', 1).single();
     if (error || !data) {
-        if (!cached) Toast.show('Could not load current rates. Pull to refresh or contact an admin.', { error: true });
+        Toast.show('Could not load current rates. Check your connection and reload.', { error: true, duration: 6000 });
         return;
     }
     currentConfig = data;
-    writeCachedConfig(data);
     updateLiveStats();
+    setPrintButtonLoading(false);
+
+    if (['SUPER_ADMIN', 'ADMIN_STAFF'].includes(window.currentProfile?.role)) {
+        renderSubscriptionBanner(data.subscription_expiry_date);
+    }
+}
+
+// Live sync: if an admin changes rates/density (or anything else in
+// daily_config) while this page is open, pick it up immediately instead
+// of requiring a reload. Requires Realtime enabled on daily_config (see
+// sql/schema.sql / the migration — it's enabled by default there).
+function subscribeToConfigChanges() {
+    window.sb
+        .channel('daily_config-sync')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
+            currentConfig = payload.new;
+            updateLiveStats();
+            Toast.show('Rates were just updated by an admin.');
+        })
+        .subscribe();
 }
 
 printBtn.addEventListener('click', async () => {
@@ -199,6 +204,10 @@ printBtn.addEventListener('click', async () => {
         return;
     }
 
+    // Fire-and-forget: let the server relay this to Discord if that's
+    // configured and enabled. Never blocks printing.
+    notifyBillCreated(inserted.id);
+
     const now = new Date();
     const printedAt = formatDateTime(now);
 
@@ -211,8 +220,6 @@ printBtn.addEventListener('click', async () => {
             logoUrl: currentConfig.logo_url,
             logoWidthMm: currentConfig.logo_width_mm,
             logoPositionPct: currentConfig.logo_position_pct,
-            logoMarginTopMm: currentConfig.logo_margin_top_mm,
-            logoMarginBottomMm: currentConfig.logo_margin_bottom_mm,
             logoRatioLocked: currentConfig.logo_ratio_locked,
             logoHeightMm: currentConfig.logo_height_mm,
         },
@@ -231,7 +238,7 @@ printBtn.addEventListener('click', async () => {
         timeStr,
         printDateStr: printedAt.dateStr,
         printTimeStr: printedAt.timeStr,
-        attendantUsername: window.currentProfile.username,
+        attendantUsername: FuelDeskAuth.displayName(window.currentProfile),
         vehicleNo: vehicleNoInput.value.trim().toUpperCase(),
         mobileNo,
     });
@@ -239,10 +246,8 @@ printBtn.addEventListener('click', async () => {
     const receiptEl = document.getElementById('thermal-receipt');
     receiptEl.innerHTML = window.BillTemplates.wrapForOutput(rendered, {
         marginMm: currentConfig.receipt_margin_mm,
-        marginTopMm: currentConfig.receipt_margin_top_mm,
         lineSpacing: currentConfig.receipt_line_spacing,
         baseFontPx: currentConfig.receipt_base_font_px,
-        footerSpaceMm: currentConfig.receipt_footer_space_mm,
     });
 
     applyReceiptWidth(currentConfig.receipt_width_cm);
@@ -258,20 +263,34 @@ printBtn.addEventListener('click', async () => {
     mobileNoInput.value = '';
 });
 
+async function notifyBillCreated(transactionId) {
+    try {
+        const { data: { session } } = await window.sb.auth.getSession();
+        await fetch('/api/notify/bill-created', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ transactionId }),
+        });
+    } catch {
+        // Non-critical — never interrupt billing over a notification failing.
+    }
+}
+
 (async function init() {
-    const profile = await FuelDeskAuth.requireSession(); // any active, logged-in user (admin or staff)
+    const profile = await FuelDeskAuth.requireSession(); // any active, logged-in user
     if (!profile) return;
 
-    whoami.textContent = `Logged in as ${profile.username}`;
-    roleBadge.textContent = profile.role === 'ADMIN_STAFF' ? 'Admin' : 'Staff';
+    whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
+    roleBadge.textContent = FuelDeskAuth.roleLabel(profile.role);
     updateInputLabel();
     FuelDeskAuth.renderPanelSwitcher('billing');
 
-    if (profile.role === 'ADMIN_STAFF') {
+    if (profile.role === 'SUPER_ADMIN' || profile.role === 'ADMIN_STAFF') {
         const staffBtn = document.getElementById('staff-nav-btn');
         staffBtn.style.display = 'flex';
         staffBtn.addEventListener('click', () => window.location.href = '/staff.html');
     }
 
     await loadConfig();
+    subscribeToConfigChanges();
 })();

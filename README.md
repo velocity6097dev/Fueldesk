@@ -19,14 +19,24 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/004_format_panel.sql`
      - `sql/migrations/005_logo_slider_random_pump_ids.sql`
      - `sql/migrations/006_footer_space.sql`
+     - `sql/migrations/007_super_admin_discord_subscription.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
      column) hadn't been run yet — run it and it'll start appearing.
+     **After running `007`**, promote whichever existing account should
+     be your Super Admin (see the comment inside that file for the exact
+     `update profiles set role = 'SUPER_ADMIN' ...` line) — otherwise
+     everyone who was previously an Admin is now the restricted,
+     rates-only Admin tier and nobody can reach Settings/Format/
+     Integrations until you do this.
 3. In **Project Settings → API**, copy:
    - `Project URL` → `SUPABASE_URL`
    - `anon public` key → `SUPABASE_ANON_KEY`
    - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (click "reveal")
+
+**Requires Node.js 18 or newer** (the Discord integration uses the
+built-in `fetch`, not a separate HTTP library).
 
 ## 2. Configure the app
 
@@ -36,7 +46,7 @@ cp .env.example .env
 npm install
 ```
 
-## 3. Create your first admin login
+## 3. Create your first Super Admin login
 
 There's a chicken-and-egg problem: creating staff normally requires an
 admin to already be logged in. Solve it once with:
@@ -45,9 +55,12 @@ admin to already be logged in. Solve it once with:
 npm run create-admin -- yourname yourpassword
 ```
 
-(password/PIN must be at least 6 characters). After this, log in at
-`/login.html` with that username/password and use the Staff page
-(top-bar icon) to add everyone else — you won't need this script again.
+(password/PIN must be at least 6 characters; add a display name as
+extra arguments if you want one, e.g. `-- yourname yourpassword Jane Doe`).
+This creates a **Super Admin** — the top rank, with access to every
+adjustment feature. After this, log in at `/login.html` with that
+username/password and use the Staff page (top-bar icon) to add Admins
+and Station Staff — you won't need this script again.
 
 ## 4. Run it
 
@@ -56,9 +69,24 @@ npm start
 ```
 
 - Login: `http://localhost:3000/login.html`
-- Everyone (admin and station staff) logs in at the same URL and lands
-  on the Billing screen. Admins additionally get a bottom nav to switch
-  to Settings, and a Staff icon in the top bar.
+- Everyone logs in at the same URL and lands on the Billing screen.
+  Super Admin and Admin additionally get a bottom nav to switch to
+  Settings, and a Staff icon in the top bar.
+
+## Roles
+
+Three tiers, each able to manage (add/deactivate/delete) only the ranks
+strictly below it:
+
+| Rank | Billing | Rates/Density | Settings (branding, Format, Integrations) | Manage Staff |
+|---|---|---|---|---|
+| **Super Admin** | ✅ | ✅ | ✅ everything | Everyone |
+| **Admin Staff** | ✅ | ✅ | ❌ (rates/density card only) | Station Staff only |
+| **Station Staff** | ✅ | ❌ | ❌ | ❌ |
+
+This is enforced server-side in `server.js` (not just hidden in the
+UI) — an Admin Staff account can't reach Super-Admin-only data even by
+calling the API directly.
 
 ## What changed from your original files, and why
 
@@ -331,6 +359,59 @@ to `/login.html` with an explanation. Existing sessions from before
 this update get a fresh 12-hour clock starting now, rather than being
 logged out immediately.
 
+## Fourth round of changes
+
+**Removed "Space Above" / "Space Below Footer" entirely**, per direct
+testing feedback — both relied on CSS padding, which apparently isn't
+reliable through every print path. Rather than guess further, they're
+gone so it can be tested without that variable in play. Side margin,
+line spacing, and text size (which don't have the same issue) are still
+in Format.
+
+**Three-tier roles: Super Admin / Admin / Station Staff.** See the
+table in the setup section above. This is a real permission boundary —
+`server.js` checks the caller's rank on every relevant route, not just
+the UI hiding buttons.
+
+**Staff display names.** Add Staff (on the Staff page) now has a
+Display Name field — "Logged in as ..." throughout the app shows that
+instead of the login username. Username still exists and is still what
+you type to log in; display name is purely cosmetic.
+
+**Discord integration** (Settings → Integrations, Super Admin only):
+bill-created notifications, weekly summaries (every Monday), and
+monthly summaries (1st of the month) — each independently toggleable,
+plus a master on/off switch and a "Send Test Message" button. All the
+logic lives in `discord.js` on the server, scheduled with `node-cron`.
+The webhook URL is **write-only from the UI's perspective** — once
+saved, it's never sent back to any browser, even a Super Admin's, since
+anyone holding it could post to your channel. The status shown is just
+"Configured" / "Not configured."
+
+**1-month automatic data retention.** Every night at 2am server time, a
+background job deletes `transactions` rows older than 30 days. This
+isn't configurable from the UI — it's a fixed job in `discord.js` — but
+you can change the schedule/window by editing that file directly if you
+need something different.
+
+**Hosting/subscription renewal reminder.** Super Admin can record a
+plan (1/6/12 months, shown with price *only* on that Super-Admin-only
+screen) and an expiry date in Settings. Starting 5 days before that
+date, everyone with Admin rank or above sees a banner at the top of the
+app — it never states an amount, just prompts confirming payment with
+the developer. This is a reminder for the account owner's own tracking,
+not a payment gate or lockout — the app keeps working regardless of
+what the date says.
+
+**Live rate sync.** Billing no longer shows a possibly-stale cached
+rate while fetching — the Print button stays disabled with a "Loading
+rates..." label until a fresh fetch completes. While the Billing screen
+stays open, it also listens for rate/density changes via Supabase
+Realtime and updates instantly (with a toast) if an admin changes
+something elsewhere — no reload needed. This requires Realtime enabled
+on `daily_config`, which `sql/schema.sql` and migration `007` both
+already do for you.
+
 ## Adding another receipt template
 
 1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
@@ -354,21 +435,26 @@ logged out immediately.
 ## Project structure
 
 ```
-server.js              Express server: static files, /env.js, admin API, no-cache headers
-scripts/create-first-admin.js
-sql/schema.sql                                        Full schema (fresh installs)
-sql/migrations/002_photo_vehicle_mobile.sql           Incremental: logo/footer/vehicle/mobile
-sql/migrations/003_logo_position_width_commands.sql   Incremental: logo position, width, commands
-sql/migrations/004_format_panel.sql                   Incremental: global margin/spacing/font size
+server.js              Express server: static files, /env.js, RBAC-checked API, no-cache headers
+discord.js              Discord webhooks + scheduled jobs (bill/weekly/monthly, 1-month wipe)
+scripts/create-first-admin.js   Bootstraps the first Super Admin
+sql/schema.sql                                            Full schema (fresh installs)
+sql/migrations/002_photo_vehicle_mobile.sql               Incremental: logo/footer/vehicle/mobile
+sql/migrations/003_logo_position_width_commands.sql       Incremental: logo position, width, commands
+sql/migrations/004_format_panel.sql                       Incremental: global margin/spacing/font size
+sql/migrations/005_logo_slider_random_pump_ids.sql        Incremental: logo slider, random FP/nozzle
+sql/migrations/006_footer_space.sql                       Incremental: (superseded by 007's removal)
+sql/migrations/007_super_admin_discord_subscription.sql   Incremental: roles, Discord, subscription
 public/
   login.html / login.js     Universal login, Remember Me
-  billing.html / billing.js Lands here after login (everyone)
-  admin.html / admin.js     "Settings" — rates, branding, receipt setup (admin only)
-  staff.html / staff.js     Add/deactivate/delete staff (admin only)
-  format.html / format.js   Live margin/spacing/font-size editor (admin only)
+  billing.html / billing.js Lands here after login (everyone) — live rate sync
+  admin.html / admin.js     "Settings" — role-gated: Super Admin sees everything, Admin sees rates only
+  staff.html / staff.js     Add/deactivate/delete staff, scoped to caller's rank
+  format.html / format.js   Live logo/margin/spacing/font-size editor (Super Admin only)
+  integrations.html / integrations.js   Discord webhook setup (Super Admin only)
   css/style.css              Shared design tokens + components
   js/supabaseClient.js       Builds the Supabase client, Remember Me storage adapter
-  js/authGuard.js            Session + role check, Billing/Settings switcher nav
-  js/ui.js                   Toast, bottom-sheet picker, info popover, print-width helper
+  js/authGuard.js            Session + role check, 12h expiry, Billing/Settings switcher nav
+  js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, print helpers
   templates/                 One file per receipt layout
 ```
