@@ -10,11 +10,11 @@
     // sizes that silently overrode the global one).
     // ---------------------------------------------------------------
     const TEXT_SCALE = {
-        stationName: 1.0, //1.0
-        addressPhone: 1.0, //0.91`
-        fieldBlock: 1.0, //1.0
-        labelColWidth: 4.9,  //4.9 em -- reserved width for the label column before the colon
-        footer: 1.0, //1.0
+        stationName: 1.0,
+        addressPhone: 1.0,//0.91
+        fieldBlock: 1.0,
+        labelColWidth: 4.9,  // em -- reserved width for the label column before the colon
+        footer: 1.0,
     };
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };

@@ -86,6 +86,12 @@
                     <span>Bill Date &amp; Time</span>
                     <input type="datetime-local" id="custom-datetime">
                 </label>
+
+                <label class="field" id="custom-rate-input" style="display:none;margin-top:14px;">
+                    <span>Rate That Day (₹/L)</span>
+                    <input type="number" id="backdate-rate" step="0.01" min="0" inputmode="decimal">
+                    <div class="hint" style="margin-top:6px;">Backdated bills use this rate for the calculation and on the printed receipt, not today's current rate.</div>
+                </label>
             </div>
 
             <button type="button" id="print-btn" class="btn btn-primary btn-block" style="padding:15px;font-size:15.5px;">Print Bill</button>

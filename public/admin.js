@@ -22,6 +22,7 @@ const previewReceiptBtn = document.getElementById('preview-receipt-btn');
 
 const subscriptionExpiryInput = document.getElementById('subscription-expiry');
 const saveSubscriptionBtn = document.getElementById('save-subscription-btn');
+const renewedTodayBtn = document.getElementById('renewed-today-btn');
 
 const msRateInput = document.getElementById('ms-rate');
 const msDensityInput = document.getElementById('ms-density');
@@ -49,6 +50,15 @@ const planPicker = makePickerField({
     title: 'Hosting Plan',
     options: PLAN_OPTIONS,
     initialValue: '1M',
+});
+
+const PLAN_MONTHS = { '1M': 1, '6M': 6, '12M': 12 };
+renewedTodayBtn.addEventListener('click', () => {
+    const months = PLAN_MONTHS[planPicker.get()] || 1;
+    const expiry = new Date();
+    expiry.setMonth(expiry.getMonth() + months);
+    subscriptionExpiryInput.value = expiry.toISOString().slice(0, 10);
+    Toast.show(`Expiry set to ${months} month${months === 1 ? '' : 's'} from today — remember to Save.`);
 });
 
 wireCommandsInfoButton(document.getElementById('name-info-btn'), 'Station Name');
@@ -141,8 +151,8 @@ logoRemoveBtn.addEventListener('click', async () => {
     }
 });
 
-async function loadConfig() {
-    const { data, error } = await window.sb.from('daily_config').select('*').eq('id', 1).single();
+async function loadConfig(inFlightPromise) {
+    const { data, error } = await (inFlightPromise || window.sb.from('daily_config').select('*').eq('id', 1).single());
     if (error || !data) {
         Toast.show('Could not load settings.', { error: true, duration: 5000 });
         return;
@@ -261,14 +271,16 @@ previewReceiptBtn.addEventListener('click', async () => {
 });
 
 (async function init() {
+    const configPromise = window.sb.from('daily_config').select('*').eq('id', 1).single();
+
     const profile = await FuelDeskAuth.requireSession(['SUPER_ADMIN', 'ADMIN_STAFF']);
     if (!profile) return;
 
     whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
     roleBadge.textContent = FuelDeskAuth.roleLabel(profile.role);
 
-    if (profile.role !== 'SUPER_ADMIN') {
-        superAdminSection.style.display = 'none';
+    if (profile.role === 'SUPER_ADMIN') {
+        superAdminSection.classList.remove('hidden');
     }
 
     // The template picker was created with an empty option list (templates
@@ -277,5 +289,5 @@ previewReceiptBtn.addEventListener('click', async () => {
     TEMPLATE_OPTIONS_FALLBACK.push(...options);
 
     FuelDeskAuth.renderPanelSwitcher('admin');
-    await loadConfig();
+    await loadConfig(configPromise);
 })();

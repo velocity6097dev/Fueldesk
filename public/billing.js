@@ -19,6 +19,8 @@ const vehicleNoInput = document.getElementById('vehicle-no');
 const mobileNoInput = document.getElementById('mobile-no');
 const customTimeInputs = document.getElementById('custom-time-inputs');
 const customDatetime = document.getElementById('custom-datetime');
+const customRateField = document.getElementById('custom-rate-input');
+const backdateRateInput = document.getElementById('backdate-rate');
 const printBtn = document.getElementById('print-btn');
 const displayRate = document.getElementById('display-rate');
 const displayDensity = document.getElementById('display-density');
@@ -32,7 +34,7 @@ const productPicker = makePickerField({
     labelEl: document.getElementById('product-picker-label'),
     title: 'Select Product',
     options: PRODUCT_OPTIONS,
-    initialValue: 'MS',
+    initialValue: 'HSD',
 });
 document.getElementById('product-picker-btn').addEventListener('picker-change', updateLiveStats);
 
@@ -41,7 +43,7 @@ const modePicker = makePickerField({
     labelEl: document.getElementById('mode-picker-label'),
     title: 'Select Billing Mode',
     options: MODE_OPTIONS,
-    initialValue: 'VOLUME',
+    initialValue: 'AMOUNT',
 });
 document.getElementById('mode-picker-btn').addEventListener('picker-change', updateInputLabel);
 
@@ -55,7 +57,12 @@ const timeModePicker = makePickerField({
 document.getElementById('time-mode-picker-btn').addEventListener('picker-change', (e) => {
     const isBackdate = e.detail === 'BACKDATE';
     customTimeInputs.style.display = isBackdate ? 'flex' : 'none';
+    customRateField.style.display = isBackdate ? 'flex' : 'none';
     if (isBackdate && !customDatetime.value) customDatetime.value = defaultDatetimeLocalValue();
+    if (isBackdate && !backdateRateInput.value && currentConfig) {
+        const { rateField } = fieldsForProduct(productPicker.get());
+        backdateRateInput.value = Number(currentConfig[rateField]).toFixed(2);
+    }
 });
 
 function fieldsForProduct(product) {
@@ -97,10 +104,10 @@ function setPrintButtonLoading(isLoading) {
 // Rates/density are always fetched fresh — no stale-cache shortcut.
 // Billing is blocked (Print stays disabled) until this succeeds, so
 // nobody can accidentally bill against out-of-date numbers.
-async function loadConfig() {
+async function loadConfig(inFlightPromise) {
     setPrintButtonLoading(true);
 
-    const { data, error } = await window.sb.from('daily_config').select('*').eq('id', 1).single();
+    const { data, error } = await (inFlightPromise || window.sb.from('daily_config').select('*').eq('id', 1).single());
     if (error || !data) {
         Toast.show('Could not load current rates. Check your connection and reload.', { error: true, duration: 6000 });
         return;
@@ -109,9 +116,7 @@ async function loadConfig() {
     updateLiveStats();
     setPrintButtonLoading(false);
 
-    if (['SUPER_ADMIN', 'ADMIN_STAFF'].includes(window.currentProfile?.role)) {
-        renderSubscriptionBanner(data.subscription_expiry_date);
-    }
+    renderSubscriptionBanner(data.subscription_expiry_date);
 }
 
 // Live sync: if an admin changes rates/density (or anything else in
@@ -149,16 +154,15 @@ printBtn.addEventListener('click', async () => {
     const product = productPicker.get();
     const mode = modePicker.get();
     const { rateField, densityField } = fieldsForProduct(product);
-    const rate = Number(currentConfig[rateField]);
     const density = Number(currentConfig[densityField]);
-
-    const volume = mode === 'VOLUME' ? inputVal : +(inputVal / rate).toFixed(2);
-    const amount = mode === 'AMOUNT' ? inputVal : +(inputVal * rate).toFixed(2);
 
     const timeMode = timeModePicker.get();
     let billDateTime;
+    let rate;
+
     if (timeMode === 'CURRENT') {
         billDateTime = new Date();
+        rate = Number(currentConfig[rateField]);
     } else {
         if (!customDatetime.value) {
             Toast.show('Choose a backdated date & time.', { error: true });
@@ -169,7 +173,16 @@ printBtn.addEventListener('click', async () => {
             Toast.show('That backdated date & time is not valid.', { error: true });
             return;
         }
+        rate = parseFloat(backdateRateInput.value);
+        if (!rate || rate <= 0) {
+            Toast.show('Enter the rate that was in effect on that day.', { error: true });
+            return;
+        }
     }
+
+    const volume = mode === 'VOLUME' ? inputVal : +(inputVal / rate).toFixed(2);
+    const amount = mode === 'AMOUNT' ? inputVal : +(inputVal * rate).toFixed(2);
+
     const { dateStr, timeStr } = formatDateTime(billDateTime);
 
     printBtn.disabled = true;
@@ -261,6 +274,7 @@ printBtn.addEventListener('click', async () => {
     inputValue.value = '';
     vehicleNoInput.value = '';
     mobileNoInput.value = '';
+    backdateRateInput.value = '';
 });
 
 async function notifyBillCreated(transactionId) {
@@ -277,6 +291,13 @@ async function notifyBillCreated(transactionId) {
 }
 
 (async function init() {
+    // Fired off immediately, in parallel with the auth/role check below —
+    // reading daily_config only needs "authenticated", which is already
+    // true the instant a session exists in the client, so there's no
+    // reason to wait for the separate profile-role lookup to finish
+    // first. Shaves a full network round-trip off every page load.
+    const configPromise = window.sb.from('daily_config').select('*').eq('id', 1).single();
+
     const profile = await FuelDeskAuth.requireSession(); // any active, logged-in user
     if (!profile) return;
 
@@ -291,6 +312,6 @@ async function notifyBillCreated(transactionId) {
         staffBtn.addEventListener('click', () => window.location.href = '/staff.html');
     }
 
-    await loadConfig();
+    await loadConfig(configPromise);
     subscribeToConfigChanges();
 })();

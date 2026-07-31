@@ -20,6 +20,7 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/005_logo_slider_random_pump_ids.sql`
      - `sql/migrations/006_footer_space.sql`
      - `sql/migrations/007_super_admin_discord_subscription.sql`
+     - `sql/migrations/008_fix_staff_delete_fk.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
@@ -412,6 +413,64 @@ something elsewhere — no reload needed. This requires Realtime enabled
 on `daily_config`, which `sql/schema.sql` and migration `007` both
 already do for you.
 
+## Fifth round of fixes
+
+**Fixed: deleting staff failed with a 500 / foreign-key error.**
+`transactions.attendant_id` referenced `profiles(id)` with no `ON
+DELETE` behavior (the Postgres default, `NO ACTION`), so deleting a
+staff account that had ever billed anything was blocked outright —
+exactly the error Supabase's own table editor surfaced. Fixed to `ON
+DELETE SET NULL`: the login can now be deleted, its past bills stay
+intact (the receipt still shows the attendant's name, since
+`attendant_username` is a separate stored snapshot, not a live join),
+and those bills still get cleaned up normally by the 1-month retention
+job. **Run `sql/migrations/008_fix_staff_delete_fk.sql`** to pick this
+up on an existing database.
+
+**Backdated bills now ask for that day's rate.** A "Rate That Day
+(₹/L)" field appears only when Backdated is selected, pre-filled with
+today's rate as a starting point but editable — the bill is calculated
+against and printed with whatever you enter there, not today's live
+rate. Bills using "Current Time" are unaffected and still use today's
+rate as before.
+
+**The hosting-renewal banner is now visible to everyone**, not just
+Admin ranks — so any staff member can notice it and flag it to an
+admin, as asked.
+
+**Subscription expiry: auto-calculate.** A "Renewed Today — Auto-Fill
+Expiry" button in Settings → Hosting Subscription sets the expiry date
+to today plus the selected plan's length, instead of requiring manual
+date math.
+
+**Fixed: brief flash of Super Admin-only settings for Admin accounts.**
+The Super-Admin-only section of Settings was visible by default in the
+HTML and only hidden by JavaScript after the role check finished,
+creating a real (if brief) flash of content an Admin account shouldn't
+see. It now starts hidden and is only revealed once the role is
+confirmed. Also parallelized the rates fetch with the login/role check
+on Billing and Settings (they don't actually depend on each other) to
+shave a network round-trip off every page load, which should help with
+switching between Billing and Settings feeling faster. Some of that
+delay is inherent to this being a normal multi-page app (each switch is
+a full page load, not a single-page-app transition) — that part isn't
+something a targeted fix changes.
+
+**Fixed: Discord messages arriving out of order and sometimes missing
+entirely.** Both were symptoms of the same root cause — messages were
+fired off concurrently with no ordering guarantee and no handling for
+Discord's webhook rate limit (~5 requests/2 seconds), so a burst of
+bills printed close together could get silently dropped by a 429
+response. Rewrote `discord.js` around a proper send queue: every
+message now goes through one at a time, in the order it was created,
+with automatic retry (honoring Discord's own `retry_after`) if a send
+is rate-limited or fails. I verified this fixes both symptoms with an
+actual test — enqueuing three messages where the middle one is forced
+to hit a simulated rate-limit and confirming all three still arrive in
+original order. **Discord messages now also show the staff member's
+display name**, not their login username, resolved server-side for
+both bill notifications and the weekly/monthly summaries.
+
 ## Adding another receipt template
 
 1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
@@ -445,6 +504,7 @@ sql/migrations/004_format_panel.sql                       Incremental: global ma
 sql/migrations/005_logo_slider_random_pump_ids.sql        Incremental: logo slider, random FP/nozzle
 sql/migrations/006_footer_space.sql                       Incremental: (superseded by 007's removal)
 sql/migrations/007_super_admin_discord_subscription.sql   Incremental: roles, Discord, subscription
+sql/migrations/008_fix_staff_delete_fk.sql                Incremental: fixes staff deletion (important)
 public/
   login.html / login.js     Universal login, Remember Me
   billing.html / billing.js Lands here after login (everyone) — live rate sync
@@ -458,4 +518,3 @@ public/
   js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, print helpers
   templates/                 One file per receipt layout
 ```
-

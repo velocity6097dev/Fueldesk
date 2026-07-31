@@ -188,7 +188,12 @@ create table if not exists transactions (
     vehicle_no       varchar(20),
     mobile_no        varchar(15),
 
-    attendant_id       uuid references profiles(id),
+    -- SET NULL (not the default NO ACTION) so a staff account can be
+    -- deleted without deleting/blocking their past bills — the bill's
+    -- attendant_username is a separate stored snapshot that survives
+    -- regardless, and the transaction itself still gets cleaned up
+    -- normally by the 1-month retention job.
+    attendant_id       uuid references profiles(id) on delete set null,
     attendant_username varchar(50),
 
     created_at       timestamptz not null default now()
