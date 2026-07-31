@@ -3,4 +3,4 @@ node_modules/
 .DS_Store
 npm-debug.log*
 versions/
-error-logs
+error-logs.md
