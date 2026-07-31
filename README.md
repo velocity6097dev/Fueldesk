@@ -458,4 +458,4 @@ public/
   js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, print helpers
   templates/                 One file per receipt layout
 ```
-trial test webhook
+
