@@ -471,6 +471,46 @@ original order. **Discord messages now also show the staff member's
 display name**, not their login username, resolved server-side for
 both bill notifications and the weekly/monthly summaries.
 
+## Sixth round: error page & offline handling
+
+**New `/error.html`** replaces the plain 404 template you sent over —
+same illustration (`public/resources/bg.gif`), rebuilt with the app's
+own navy/amber design system instead of Bootstrap + a green button.
+Handles four situations via `?type=`: `404`, `500`, `offline`, and
+`402` (available if you ever need a "payment required" message, but
+nothing automatically triggers it — see the note below). Every variant
+has a **Try Again** button (reloads the page) and a **Go to Home**
+button (`/billing.html`, which is the correct landing spot for every
+role — Station Staff, Admin, and Super Admin alike).
+
+**The server actually routes to it now.** Any unmatched page URL
+(a bad or old link, a typo) 302-redirects to `/error.html?type=404`.
+Unmatched `/api/...` requests get a plain JSON 404 instead, so
+`fetch()` callers elsewhere in the app aren't handed HTML they can't
+parse. A generic error-handling middleware does the same for
+unexpected 500s.
+
+**Offline detection doesn't navigate you away.** Losing your
+connection mid-bill and getting redirected to a whole other page would
+lose whatever you'd typed, so this is a full-screen **overlay** instead
+(`initOfflineWatcher()` in `public/js/ui.js`, self-starting on every
+page that loads `ui.js` — which is now all of them, including login).
+It appears the instant the browser fires its `offline` event, shows a
+live "waiting for a connection..." status, and disappears on its own
+the moment `online` fires — no page reload, nothing lost. `error.html`
+itself uses the same live status text for the same reason, in case
+someone lands there directly while offline.
+
+**On the `402` type — being explicit about what this is and isn't.**
+I added the message variant since you mentioned it, but I did **not**
+wire up any automatic payment-enforcement logic that would trigger it
+— nothing in the app currently redirects here based on subscription
+status. That's consistent with the hosting-renewal banner from earlier:
+it's a reminder for the account owner, not a lockout. If you do want an
+actual enforced paywall at some point, that's a meaningfully bigger
+(and more consequential) feature worth discussing directly rather than
+something to bundle in quietly.
+
 ## Adding another receipt template
 
 1. Copy `public/templates/bpclTokheim.js` (boxed/grid style) or
@@ -512,9 +552,11 @@ public/
   staff.html / staff.js     Add/deactivate/delete staff, scoped to caller's rank
   format.html / format.js   Live logo/margin/spacing/font-size editor (Super Admin only)
   integrations.html / integrations.js   Discord webhook setup (Super Admin only)
+  error.html / error.js     404 / offline / 500 / 402 — matches the app's own design system
+  resources/bg.gif           Illustration used by error.html and the offline overlay
   css/style.css              Shared design tokens + components
   js/supabaseClient.js       Builds the Supabase client, Remember Me storage adapter
   js/authGuard.js            Session + role check, 12h expiry, Billing/Settings switcher nav
-  js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, print helpers
+  js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, offline overlay, print helpers
   templates/                 One file per receipt layout
 ```

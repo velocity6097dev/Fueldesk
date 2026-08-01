@@ -394,6 +394,28 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+// ---------------------------------------------------------------
+// 404 / generic error handling. API requests get a JSON response
+// (so fetch() callers can still parse it normally); anything else —
+// a bad/old link, a typo'd URL — goes to the same error page the
+// offline overlay uses, styled to match the rest of the app instead
+// of a bare Express/browser error screen.
+// ---------------------------------------------------------------
+app.use((req, res) => {
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Not found' });
+    }
+    res.redirect('/error.html?type=404');
+});
+
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    if (req.path.startsWith('/api/')) {
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+    res.redirect('/error.html?type=500');
+});
+
 app.listen(PORT, () => {
     console.log(`FuelDesk running at http://localhost:${PORT}`);
     console.log(`- Login:   http://localhost:${PORT}/login.html`);

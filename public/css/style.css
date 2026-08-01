@@ -551,6 +551,30 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 }
 .chip-btn.active { background: var(--amber); border-color: var(--amber); color: #fff; }
 
+/* ---------------- Error page (error.html) ---------------- */
+.error-card { text-align: center; }
+.error-illustration { width: 100%; max-width: 260px; margin: 0 auto 18px; display: block; }
+.error-title { font-family: var(--font-display); font-size: 21px; color: var(--navy); margin-bottom: 8px; }
+.error-message { font-size: 13.5px; color: var(--ink-soft); margin-bottom: 6px; line-height: 1.5; }
+.error-status { font-size: 12px; color: var(--red); font-weight: 700; margin-bottom: 16px; min-height: 16px; }
+.error-status.online { color: var(--green); }
+
+/* ---------------- Offline overlay (shown over any app page) ---------------- */
+.offline-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(11,53,86,0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.offline-card {
+  background: var(--paper); border-radius: 16px; padding: 26px 22px;
+  max-width: 340px; width: 100%; text-align: center;
+  box-shadow: 0 20px 48px rgba(0,0,0,0.3);
+}
+.offline-illustration { width: 100%; max-width: 190px; margin: 0 auto 14px; display: block; }
+.offline-card h2 { font-family: var(--font-display); font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+.offline-card p { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 10px; }
+.offline-card .offline-status { font-weight: 700; color: var(--red); margin-bottom: 16px; }
+
 /* ---------------- Subscription/hosting renewal warning banner ---------------- */
 .subscription-banner {
   background: linear-gradient(90deg, #92400e, #b45309);

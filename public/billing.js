@@ -34,7 +34,7 @@ const productPicker = makePickerField({
     labelEl: document.getElementById('product-picker-label'),
     title: 'Select Product',
     options: PRODUCT_OPTIONS,
-    initialValue: 'HSD',
+    initialValue: 'MS',
 });
 document.getElementById('product-picker-btn').addEventListener('picker-change', updateLiveStats);
 
@@ -43,7 +43,7 @@ const modePicker = makePickerField({
     labelEl: document.getElementById('mode-picker-label'),
     title: 'Select Billing Mode',
     options: MODE_OPTIONS,
-    initialValue: 'AMOUNT',
+    initialValue: 'VOLUME',
 });
 document.getElementById('mode-picker-btn').addEventListener('picker-change', updateInputLabel);
 

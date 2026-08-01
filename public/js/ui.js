@@ -26,6 +26,46 @@ window.Toast = (function () {
     return { show };
 })();
 
+// Self-initializing: shows a full-screen overlay the moment the browser
+// goes offline, on top of whatever page/form the person is in the
+// middle of — deliberately NOT a navigation, so nothing they've typed
+// gets lost. Hides itself automatically the moment connectivity returns.
+(function initOfflineWatcher() {
+    let overlay = null;
+
+    function ensureOverlay() {
+        if (overlay) return overlay;
+        overlay = document.createElement('div');
+        overlay.className = 'offline-overlay hidden';
+        overlay.innerHTML = `
+            <div class="offline-card">
+                <img src="/resources/bg.gif" alt="" class="offline-illustration">
+                <h2>You're Offline</h2>
+                <p>FuelDesk needs an internet connection to load rates and save bills. Reconnect, then try again.</p>
+                <p class="offline-status">Waiting for a connection...</p>
+                <button type="button" class="btn btn-primary btn-block offline-retry-btn">Try Again</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.offline-retry-btn').addEventListener('click', () => {
+            if (navigator.onLine) {
+                overlay.classList.add('hidden');
+            } else {
+                overlay.querySelector('.offline-status').textContent = 'Still offline — check your connection.';
+            }
+        });
+        return overlay;
+    }
+
+    function show() { ensureOverlay().classList.remove('hidden'); }
+    function hide() { if (overlay) overlay.classList.add('hidden'); }
+
+    window.addEventListener('offline', show);
+    window.addEventListener('online', hide);
+
+    if (!navigator.onLine) show(); // page happened to load while already offline
+})();
+
 // Small "what can I type here" help popover — used by the (i) buttons
 // next to the Address and Receipt Footer fields in Admin.
 window.InfoTip = (function () {
