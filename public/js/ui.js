@@ -285,6 +285,40 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// Locks the page from scrolling while a modal/sheet/overlay is open.
+// The actual styling lives in style.css under body.scroll-locked — this
+// just toggles that class and sets the one value that has to be dynamic
+// (how far the page had scrolled), via a CSS variable. Restores the
+// exact scroll position on unlock.
+//
+// Counts open locks instead of a plain boolean, so if one popup opens
+// while another is already open (e.g. an InfoTip opened from inside a
+// SheetPicker), the page only unlocks once *all* of them have closed.
+window.ScrollLock = (function () {
+    let count = 0;
+    let savedScrollY = 0;
+
+    function lock() {
+        if (count === 0) {
+            savedScrollY = window.scrollY;
+            document.documentElement.style.setProperty('--scroll-lock-offset', `-${savedScrollY}px`);
+            document.body.classList.add('scroll-locked');
+        }
+        count++;
+    }
+
+    function unlock() {
+        count = Math.max(0, count - 1);
+        if (count === 0) {
+            document.body.classList.remove('scroll-locked');
+            document.documentElement.style.removeProperty('--scroll-lock-offset');
+            window.scrollTo(0, savedScrollY);
+        }
+    }
+
+    return { lock, unlock };
+})();
+
 window.Toast = (function () {
     let el = null;
     let hideTimer = null;
@@ -333,7 +367,7 @@ window.Toast = (function () {
         document.body.appendChild(overlay);
         overlay.querySelector('.offline-retry-btn').addEventListener('click', () => {
             if (navigator.onLine) {
-                overlay.classList.add('hidden');
+                hide();
             } else {
                 overlay.querySelector('.offline-status').textContent = 'Still offline — check your connection.';
             }
@@ -341,8 +375,19 @@ window.Toast = (function () {
         return overlay;
     }
 
-    function show() { ensureOverlay().classList.remove('hidden'); }
-    function hide() { if (overlay) overlay.classList.add('hidden'); }
+    function show() {
+        const node = ensureOverlay();
+        if (node.classList.contains('hidden')) {
+            node.classList.remove('hidden');
+            window.ScrollLock.lock();
+        }
+    }
+    function hide() {
+        if (overlay && !overlay.classList.contains('hidden')) {
+            overlay.classList.add('hidden');
+            window.ScrollLock.unlock();
+        }
+    }
 
     window.addEventListener('offline', show);
     window.addEventListener('online', hide);
@@ -373,13 +418,19 @@ window.InfoTip = (function () {
     }
 
     function close() {
-        if (modal) modal.classList.add('hidden');
+        if (modal && !modal.classList.contains('hidden')) {
+            modal.classList.add('hidden');
+            window.ScrollLock.unlock();
+        }
     }
 
     function show({ title, bodyHtml }) {
         const node = ensure();
         node.querySelector('.sheet-title').textContent = title || '';
         node.querySelector('.info-body').innerHTML = bodyHtml || '';
+        if (node.classList.contains('hidden')) {
+            window.ScrollLock.lock();
+        }
         node.classList.remove('hidden');
     }
 
@@ -491,11 +542,17 @@ window.SheetPicker = (function () {
     }
 
     function close() {
-        if (overlay) overlay.classList.remove('open');
+        if (overlay && overlay.classList.contains('open')) {
+            overlay.classList.remove('open');
+            window.ScrollLock.unlock();
+        }
     }
 
     function open({ title, options, selectedValue, onSelect }) {
         const node = ensure();
+        if (!node.classList.contains('open')) {
+            window.ScrollLock.lock();
+        }
         node.querySelector('.sheet-title').textContent = title || '';
 
         const optsEl = node.querySelector('.sheet-options');

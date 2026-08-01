@@ -713,3 +713,12 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
   transition: width 0.15s ease;
 }
+
+/*----------popup lock -----------*/
+body.scroll-locked {
+    position: fixed;
+    top: var(--scroll-lock-offset, 0);
+    left: 0;
+    right: 0;
+    width: 100%;
+}
