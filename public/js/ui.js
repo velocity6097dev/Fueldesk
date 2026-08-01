@@ -39,7 +39,7 @@ window.Toast = (function () {
         overlay.className = 'offline-overlay hidden';
         overlay.innerHTML = `
             <div class="offline-card">
-                <img src="/resources/bg.gif" alt="" class="offline-illustration">
+                <img src="./resources/bg.gif" alt="" class="offline-illustration">
                 <h2>You're Offline</h2>
                 <p>FuelDesk needs an internet connection to load rates and save bills. Reconnect, then try again.</p>
                 <p class="offline-status">Waiting for a connection...</p>
