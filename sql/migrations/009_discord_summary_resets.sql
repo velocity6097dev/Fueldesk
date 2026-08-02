@@ -12,7 +12,7 @@
 -- =========================================================
 
 alter table integrations
-    add column if not exists discord_weekly_reset_at timestamptz not null default now();
+    add column if not exists discord_weekly_reset_at timestamptz not null default (date_trunc('week', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata');
 
 alter table integrations
-    add column if not exists discord_monthly_reset_at timestamptz not null default now();
+    add column if not exists discord_monthly_reset_at timestamptz not null default (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata');

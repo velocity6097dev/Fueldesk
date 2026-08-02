@@ -47,6 +47,25 @@ function startOfTodayIST() {
     return new Date(istMidnightUtcMs).toISOString();
 }
 
+// Start of the current ISO week (Monday) at 00:00 IST — this is the
+// value the "weekly reset" pointer should hold, not the exact instant
+// the summary happened to be sent.
+function startOfWeekIST(date = new Date()) {
+    const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+    const dow = istNow.getUTCDay(); // Sun=0 ... Sat=6 (IST wall-clock day)
+    const daysSinceMonday = (dow + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+    const istMondayUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate() - daysSinceMonday);
+    return new Date(istMondayUtcMs - IST_OFFSET_MS).toISOString();
+}
+
+// Start of the current calendar month, 1st at 00:00 IST — same idea
+// for the "monthly reset" pointer.
+function startOfMonthIST(date = new Date()) {
+    const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+    const istFirstUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1);
+    return new Date(istFirstUtcMs - IST_OFFSET_MS).toISOString();
+}
+
 function createDiscordIntegration(supabaseAdmin) {
     // ---------------------------------------------------------------
     // Delivery queue. Every message goes through here, one at a time,
@@ -261,13 +280,16 @@ function createDiscordIntegration(supabaseAdmin) {
         };
     }
 
-    // Bumps a reset pointer column to "now" — the next summary of that
-    // kind will only count bills from this moment forward, which is
-    // the "reset the count to 0" behaviour.
-    async function resetPeriod(column) {
+    // Bumps a reset pointer column to the given ISO instant — the next
+    // summary of that kind will only count bills from that point
+    // forward, which is the "reset the count to 0" behaviour. The
+    // stored value is always an IST calendar boundary (Monday 00:00 for
+    // weekly, the 1st 00:00 for monthly), not the exact send instant,
+    // so the numbers read cleanly on their own.
+    async function resetPeriod(column, isoValue) {
         const { error } = await supabaseAdmin
             .from('integrations')
-            .update({ [column]: new Date().toISOString() })
+            .update({ [column]: isoValue })
             .eq('id', 1);
         if (error) console.error(`Could not reset ${column}:`, error.message);
     }
@@ -279,7 +301,7 @@ function createDiscordIntegration(supabaseAdmin) {
         const payload = await buildSummaryPayload('📊 Weekly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
         if (!payload) return;
         enqueue(config.discord_webhook_url, payload);
-        await resetPeriod('discord_weekly_reset_at');
+        await resetPeriod('discord_weekly_reset_at', startOfWeekIST());
     }
 
     async function sendMonthlySummary() {
@@ -289,7 +311,7 @@ function createDiscordIntegration(supabaseAdmin) {
         const payload = await buildSummaryPayload('🗓️ Monthly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
         if (!payload) return;
         enqueue(config.discord_webhook_url, payload);
-        await resetPeriod('discord_monthly_reset_at');
+        await resetPeriod('discord_monthly_reset_at', startOfMonthIST());
     }
 
     // Manual, on-demand "today so far" summary for Admin Staff + Station

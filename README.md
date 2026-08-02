@@ -22,6 +22,7 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/007_super_admin_discord_subscription.sql`
      - `sql/migrations/008_fix_staff_delete_fk.sql`
      - `sql/migrations/009_discord_summary_resets.sql`
+     - `sql/migrations/010_fix_discord_reset_boundaries.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`

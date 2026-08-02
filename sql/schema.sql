@@ -280,12 +280,13 @@ create table if not exists integrations (
     discord_notify_monthly_summary  boolean not null default true,
     -- Rolling "period start" pointers for the weekly/monthly summary
     -- counts. A summary counts bills since this timestamp, then the
-    -- timestamp is bumped to now() right after sending — that's the
-    -- "reset to 0" behaviour, so a server outage doesn't cause a gap
-    -- (unlike a fixed "last 7/30 days" window, this always starts
-    -- exactly where the last summary left off).
-    discord_weekly_reset_at         timestamptz not null default now(),
-    discord_monthly_reset_at        timestamptz not null default now(),
+    -- timestamp is bumped to the next IST calendar boundary (Monday
+    -- 00:00 IST for weekly, the 1st 00:00 IST for monthly) right after
+    -- sending — that's the "reset to 0" behaviour, so a server outage
+    -- doesn't cause a gap and the stored value always reads as a clean
+    -- calendar boundary, not an arbitrary send instant.
+    discord_weekly_reset_at         timestamptz not null default (date_trunc('week', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata'),
+    discord_monthly_reset_at        timestamptz not null default (date_trunc('month', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata'),
     updated_at                      timestamptz not null default now()
 );
 
