@@ -21,6 +21,7 @@ a couple of things (Row Level Security) matter for security, not just style.
      - `sql/migrations/006_footer_space.sql`
      - `sql/migrations/007_super_admin_discord_subscription.sql`
      - `sql/migrations/008_fix_staff_delete_fk.sql`
+     - `sql/migrations/009_discord_summary_resets.sql`
      All are safe to run even if part of them is already applied. **If
      your receipt footer wasn't showing up on printed bills**, that's
      almost certainly because `002` (which adds the `receipt_footer`
@@ -382,12 +383,25 @@ you type to log in; display name is purely cosmetic.
 **Discord integration** (Settings → Integrations, Super Admin only):
 bill-created notifications, weekly summaries (every Monday), and
 monthly summaries (1st of the month) — each independently toggleable,
-plus a master on/off switch and a "Send Test Message" button. All the
-logic lives in `discord.js` on the server, scheduled with `node-cron`.
-The webhook URL is **write-only from the UI's perspective** — once
-saved, it's never sent back to any browser, even a Super Admin's, since
-anyone holding it could post to your channel. The status shown is just
-"Configured" / "Not configured."
+plus a master on/off switch, a "Send Test Message" button, and a
+"Send Today's Summary" button for an on-demand summary of today's bills
+so far. All the logic lives in `discord.js` on the server, scheduled
+with `node-cron`. The webhook URL is **write-only from the UI's
+perspective** — once saved, it's never sent back to any browser, even a
+Super Admin's, since anyone holding it could post to your channel. The
+status shown is just "Configured" / "Not configured."
+
+Bill-created notifications and every summary reflect Admin Staff and
+Station Staff activity only (a Super Admin's own bills, if any, are
+excluded), and always show the bill's printed time explicitly in IST
+regardless of what timezone the server itself runs in — Discord's own
+embed timestamp auto-converts per viewer, which isn't what you want for
+"when was this actually printed." Weekly and monthly summaries count
+bills since the *last time that summary was sent* (not a fixed rolling
+window) — sending one resets its count back to 0, tracked via
+`discord_weekly_reset_at` / `discord_monthly_reset_at` on the
+`integrations` row (see migration 009). The on-demand "Today" summary
+doesn't touch either pointer — it's always bounded by IST midnight.
 
 **1-month automatic data retention.** Every night at 2am server time, a
 background job deletes `transactions` rows older than 30 days. This

@@ -4,3 +4,5 @@ node_modules/
 npm-debug.log*
 versions/
 error-logs.md 
+*.zip
+*.rar

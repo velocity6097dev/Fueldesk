@@ -8,9 +8,43 @@ const cron = require('node-cron');
 
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // Asia/Kolkata, fixed, no DST
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Per-fuel look for the "New Bill" embed — distinct emoji + sidebar
+// color so a scrolling Discord channel is scannable at a glance.
+const PRODUCT_META = {
+    MS: { label: 'Petrol (MS)', emoji: '⛽', color: 0x16a34a },
+    HSD: { label: 'Diesel (HSD)', emoji: '🛢️', color: 0x2563eb },
+    PREMIUM: { label: 'Premium', emoji: '✨', color: 0xca8a04 },
+};
+function productMeta(product) {
+    return PRODUCT_META[product] || { label: product || 'Fuel', emoji: '⛽', color: 0xd97706 };
+}
+
+// bill_time is stored as "HH:MM" (24h, the station device's local
+// clock — that's IST for a station physically in India). Discord's
+// own embed timestamp auto-converts to each viewer's own timezone,
+// which is exactly what we DON'T want for a "what time was this
+// printed" field, so we render it explicitly instead.
+function to12Hour(hhmm) {
+    if (!hhmm || !hhmm.includes(':')) return hhmm || '—';
+    const [h, m] = hhmm.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+// Start of "today" as an ISO instant, computed against IST regardless
+// of what timezone the server process itself runs in.
+function startOfTodayIST() {
+    const istNow = new Date(Date.now() + IST_OFFSET_MS);
+    const istMidnightUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET_MS;
+    return new Date(istMidnightUtcMs).toISOString();
 }
 
 function createDiscordIntegration(supabaseAdmin) {
@@ -120,24 +154,55 @@ function createDiscordIntegration(supabaseAdmin) {
         if (!config?.discord_enabled || !config?.discord_notify_bill_created || !config?.discord_webhook_url) return;
 
         const attendantName = await resolveDisplayName(transaction.attendant_id, transaction.attendant_username);
+        const { label, emoji, color } = productMeta(transaction.product);
+        const printedAt = `${transaction.bill_date ?? '—'} · ${to12Hour(transaction.bill_time)} IST`;
+
+        const fields = [
+            { name: '💰 Amount', value: `₹${Number(transaction.amount).toFixed(2)}`, inline: true },
+            { name: '🧪 Volume', value: `${transaction.volume} L`, inline: true },
+            { name: '💲 Rate', value: `₹${transaction.rate}/L`, inline: true },
+            { name: '👤 Attendant', value: attendantName, inline: true },
+            { name: '🚘 Vehicle No.', value: transaction.vehicle_no || '—', inline: true },
+        ];
+        if (transaction.mobile_no) {
+            fields.push({ name: '📱 Mobile', value: transaction.mobile_no, inline: true });
+        }
+        fields.push({
+            name: '🕒 Printed At (IST)',
+            value: transaction.is_backdated ? `${printedAt}\n⚠️ *Backdated entry*` : printedAt,
+            inline: false,
+        });
 
         enqueue(config.discord_webhook_url, {
             embeds: [{
-                title: '🧾 New Bill',
-                color: 0xd97706,
-                fields: [
-                    { name: 'Receipt No.', value: String(transaction.receipt_no ?? '—'), inline: true },
-                    { name: 'Product', value: String(transaction.product ?? '—'), inline: true },
-                    { name: 'Amount', value: `₹${transaction.amount}`, inline: true },
-                    { name: 'Volume', value: `${transaction.volume} L`, inline: true },
-                    { name: 'Attendant', value: attendantName, inline: true },
-                ],
+                author: { name: 'FuelDesk · New Bill' },
+                title: `${emoji}  ${label}`,
+                description: `Receipt **#${transaction.receipt_no ?? '—'}**`,
+                color,
+                fields,
+                footer: { text: 'FuelDesk' },
                 timestamp: new Date().toISOString(),
             }],
         });
     }
 
-    async function buildSummaryPayload(title, sinceIso) {
+    // Super Admins can technically print a bill too (any active login
+    // can), but "all staff" summaries should only reflect ADMIN_STAFF
+    // and STATION_STAFF activity. Fetching the (small) set of Super
+    // Admin ids and excluding just those, rather than requiring an
+    // explicit allow-list, keeps deleted-staff bills (attendant_id
+    // null, see migration 008) counted — we can't know their old role,
+    // but they can't be the currently-active Super Admin's own bills.
+    async function getSuperAdminIds() {
+        const { data, error } = await supabaseAdmin.from('profiles').select('id').eq('role', 'SUPER_ADMIN');
+        if (error) {
+            console.error('Could not load Super Admin ids:', error.message);
+            return [];
+        }
+        return (data || []).map((p) => p.id);
+    }
+
+    async function buildSummaryPayload(title, sinceIso, { excludeSuperAdmin = false } = {}) {
         const { data: rows, error } = await supabaseAdmin
             .from('transactions')
             .select('attendant_id, attendant_username, amount')
@@ -148,9 +213,15 @@ function createDiscordIntegration(supabaseAdmin) {
             return null;
         }
 
+        let scopedRows = rows;
+        if (excludeSuperAdmin) {
+            const superAdminIds = new Set(await getSuperAdminIds());
+            scopedRows = rows.filter((r) => !(r.attendant_id && superAdminIds.has(r.attendant_id)));
+        }
+
         // Batch-resolve display names for everyone involved, one query
         // instead of one per row.
-        const attendantIds = [...new Set(rows.map((r) => r.attendant_id).filter(Boolean))];
+        const attendantIds = [...new Set(scopedRows.map((r) => r.attendant_id).filter(Boolean))];
         const nameById = {};
         if (attendantIds.length > 0) {
             const { data: profiles } = await supabaseAdmin
@@ -164,7 +235,7 @@ function createDiscordIntegration(supabaseAdmin) {
 
         const totals = {};
         let grandTotal = 0;
-        for (const row of rows) {
+        for (const row of scopedRows) {
             const name = (row.attendant_id && nameById[row.attendant_id]) || row.attendant_username || 'Unknown';
             totals[name] = (totals[name] || 0) + Number(row.amount);
             grandTotal += Number(row.amount);
@@ -181,28 +252,65 @@ function createDiscordIntegration(supabaseAdmin) {
                 color: 0x0b3556,
                 description,
                 fields: [
-                    { name: 'Total Bills', value: String(rows.length), inline: true },
-                    { name: 'Total Amount', value: `₹${grandTotal.toFixed(2)}`, inline: true },
+                    { name: '🧾 Total Bills', value: String(scopedRows.length), inline: true },
+                    { name: '💰 Total Amount', value: `₹${grandTotal.toFixed(2)}`, inline: true },
                 ],
+                footer: { text: 'FuelDesk' },
                 timestamp: new Date().toISOString(),
             }],
         };
     }
 
+    // Bumps a reset pointer column to "now" — the next summary of that
+    // kind will only count bills from this moment forward, which is
+    // the "reset the count to 0" behaviour.
+    async function resetPeriod(column) {
+        const { error } = await supabaseAdmin
+            .from('integrations')
+            .update({ [column]: new Date().toISOString() })
+            .eq('id', 1);
+        if (error) console.error(`Could not reset ${column}:`, error.message);
+    }
+
     async function sendWeeklySummary() {
         const config = await getConfig();
         if (!config?.discord_enabled || !config?.discord_notify_weekly_summary || !config?.discord_webhook_url) return;
-        const since = new Date(Date.now() - ONE_WEEK_MS).toISOString();
-        const payload = await buildSummaryPayload('📊 Weekly Summary (all staff)', since);
-        if (payload) enqueue(config.discord_webhook_url, payload);
+        const since = config.discord_weekly_reset_at || new Date(Date.now() - ONE_WEEK_MS).toISOString();
+        const payload = await buildSummaryPayload('📊 Weekly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+        if (!payload) return;
+        enqueue(config.discord_webhook_url, payload);
+        await resetPeriod('discord_weekly_reset_at');
     }
 
     async function sendMonthlySummary() {
         const config = await getConfig();
         if (!config?.discord_enabled || !config?.discord_notify_monthly_summary || !config?.discord_webhook_url) return;
-        const since = new Date(Date.now() - ONE_MONTH_MS).toISOString();
-        const payload = await buildSummaryPayload('🗓️ Monthly Summary (all staff)', since);
-        if (payload) enqueue(config.discord_webhook_url, payload);
+        const since = config.discord_monthly_reset_at || new Date(Date.now() - ONE_MONTH_MS).toISOString();
+        const payload = await buildSummaryPayload('🗓️ Monthly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+        if (!payload) return;
+        enqueue(config.discord_webhook_url, payload);
+        await resetPeriod('discord_monthly_reset_at');
+    }
+
+    // Manual, on-demand "today so far" summary for Admin Staff + Station
+    // Staff (Super Admin's own bills, if any, excluded). Triggered from
+    // Settings → Integrations, not on a schedule, and doesn't touch the
+    // weekly/monthly reset pointers — "today" is naturally bounded by
+    // IST midnight, so there's nothing to reset.
+    async function sendTodaySummary() {
+        const config = await getConfig();
+        if (!config?.discord_enabled || !config?.discord_webhook_url) {
+            throw new Error('Discord isn\'t enabled or configured yet — set a webhook URL and enable Discord first.');
+        }
+        const since = startOfTodayIST();
+        const payload = await buildSummaryPayload('📅 Today\'s Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+        if (!payload) throw new Error('Could not build today\'s summary — check server logs.');
+
+        // Sent directly (awaited), not through the queue — same reasoning
+        // as sendTestMessage: this is a one-off manual action and the
+        // admin wants to know right away whether it actually went out.
+        const result = await sendWithRetry(config.discord_webhook_url, payload);
+        if (!result.ok) throw new Error(result.error || 'Could not send summary');
     }
 
     async function sendTestMessage() {
@@ -237,7 +345,7 @@ function createDiscordIntegration(supabaseAdmin) {
         console.log('Scheduled jobs: daily 1-month transaction wipe, weekly summary (Mon), monthly summary (1st).');
     }
 
-    return { notifyBillCreated, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs };
+    return { notifyBillCreated, sendTodaySummary, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs };
 }
 
 module.exports = { createDiscordIntegration };

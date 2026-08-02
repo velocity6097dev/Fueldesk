@@ -7,6 +7,7 @@ const notifyWeeklyCheckbox = document.getElementById('notify-weekly');
 const notifyMonthlyCheckbox = document.getElementById('notify-monthly');
 const saveBtn = document.getElementById('save-discord-btn');
 const testBtn = document.getElementById('test-discord-btn');
+const todaySummaryBtn = document.getElementById('today-summary-btn');
 
 document.getElementById('back-btn').addEventListener('click', () => window.location.href = '/admin.html');
 
@@ -80,6 +81,22 @@ testBtn.addEventListener('click', async () => {
     } finally {
         testBtn.disabled = false;
         testBtn.textContent = 'Send Test Message';
+    }
+});
+
+todaySummaryBtn.addEventListener('click', async () => {
+    todaySummaryBtn.disabled = true;
+    todaySummaryBtn.textContent = 'Sending...';
+    try {
+        const res = await fetch('/api/integrations/discord/summary/today', { method: 'POST', headers: await authHeaders() });
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || 'Could not send summary');
+        Toast.show("Today's summary sent — check your Discord channel.");
+    } catch (err) {
+        Toast.show(err.message, { error: true, duration: 5000 });
+    } finally {
+        todaySummaryBtn.disabled = false;
+        todaySummaryBtn.textContent = "Send Today's Summary";
     }
 });
 

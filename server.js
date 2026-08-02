@@ -364,6 +364,18 @@ app.post('/api/integrations/discord/test', requireSuperAdmin, async (req, res) =
     }
 });
 
+// Manual "send today's summary now" — Admin Staff + Station Staff only
+// (Super Admin's own bills, if any, excluded). Independent of the
+// scheduled weekly/monthly jobs and doesn't touch their reset pointers.
+app.post('/api/integrations/discord/summary/today', requireSuperAdmin, async (req, res) => {
+    try {
+        await discord.sendTodaySummary();
+        res.json({ sent: true });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 // ---------------------------------------------------------------
 // Bill-created notification. Any active logged-in user can call this
 // (station staff create most bills) — the server re-fetches the

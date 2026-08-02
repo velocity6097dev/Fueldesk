@@ -278,6 +278,14 @@ create table if not exists integrations (
     discord_notify_bill_created     boolean not null default true,
     discord_notify_weekly_summary   boolean not null default true,
     discord_notify_monthly_summary  boolean not null default true,
+    -- Rolling "period start" pointers for the weekly/monthly summary
+    -- counts. A summary counts bills since this timestamp, then the
+    -- timestamp is bumped to now() right after sending — that's the
+    -- "reset to 0" behaviour, so a server outage doesn't cause a gap
+    -- (unlike a fixed "last 7/30 days" window, this always starts
+    -- exactly where the last summary left off).
+    discord_weekly_reset_at         timestamptz not null default now(),
+    discord_monthly_reset_at        timestamptz not null default now(),
     updated_at                      timestamptz not null default now()
 );
 
