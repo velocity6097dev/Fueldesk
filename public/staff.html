@@ -7,7 +7,14 @@
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
+<body class="loader-active">
+
+    <div id="page-loader">
+        <div class="page-loader-mark">
+            <span class="page-loader-word">FuelDesk</span>
+            <span class="page-loader-ring"></span>
+        </div>
+    </div>
 
     <div class="app-screen">
         <div class="app-topbar">
@@ -68,6 +75,7 @@
     <script src="/js/supabaseClient.js"></script>
     <script src="/js/authGuard.js"></script>
     <script src="/js/ui.js"></script>
+    <script src="/js/pageLoader.js"></script>
     <script src="/staff.js"></script>
 </body>
 </html>

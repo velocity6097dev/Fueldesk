@@ -290,4 +290,5 @@ previewReceiptBtn.addEventListener('click', async () => {
 
     FuelDeskAuth.renderPanelSwitcher('admin');
     await loadConfig(configPromise);
+    window.PageLoader?.ready();
 })();

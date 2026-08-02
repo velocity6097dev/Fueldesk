@@ -314,4 +314,5 @@ async function notifyBillCreated(transactionId) {
 
     await loadConfig(configPromise);
     subscribeToConfigChanges();
+    window.PageLoader?.ready();
 })();

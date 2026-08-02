@@ -178,4 +178,5 @@ addStaffBtn.addEventListener('click', async () => {
 
     FuelDeskAuth.renderPanelSwitcher('admin'); // Staff lives under the Settings tab conceptually
     await loadStaff();
+    window.PageLoader?.ready();
 })();

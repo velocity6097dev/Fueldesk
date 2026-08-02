@@ -211,4 +211,5 @@ async function loadConfig() {
     TEMPLATE_OPTIONS_FALLBACK.push(...options);
 
     await loadConfig();
+    window.PageLoader?.ready();
 })();

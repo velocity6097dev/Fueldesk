@@ -89,4 +89,5 @@ testBtn.addEventListener('click', async () => {
 
     whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
     await loadStatus();
+    window.PageLoader?.ready();
 })();
