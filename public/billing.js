@@ -15,6 +15,9 @@ const TIME_MODE_OPTIONS = [
 
 const inputValue = document.getElementById('input-value');
 const inputValueLabel = document.getElementById('input-value-label');
+const amountPreviewBox = document.getElementById('amount-preview-box');
+const amountPreviewMain = document.getElementById('amount-preview-main');
+const amountPreviewWords = document.getElementById('amount-preview-words');
 const vehicleNoInput = document.getElementById('vehicle-no');
 const mobileNoInput = document.getElementById('mobile-no');
 const customTimeInputs = document.getElementById('custom-time-inputs');
@@ -45,7 +48,11 @@ const modePicker = makePickerField({
     options: MODE_OPTIONS,
     initialValue: 'AMOUNT',
 });
-document.getElementById('mode-picker-btn').addEventListener('picker-change', updateInputLabel);
+document.getElementById('mode-picker-btn').addEventListener('picker-change', () => {
+    updateInputLabel();
+    updateAmountPreview();
+});
+inputValue.addEventListener('input', updateAmountPreview);
 
 const timeModePicker = makePickerField({
     buttonEl: document.getElementById('time-mode-picker-btn'),
@@ -79,6 +86,79 @@ function updateLiveStats() {
 
 function updateInputLabel() {
     inputValueLabel.textContent = modePicker.get() === 'VOLUME' ? 'Enter Volume (Liters)' : 'Enter Amount (₹)';
+}
+
+// ---- Live yellow preview under the amount/volume field ----
+
+const NUM_WORDS_ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const NUM_WORDS_TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function twoDigitWords(n) {
+    if (n < 20) return NUM_WORDS_ONES[n];
+    const t = Math.floor(n / 10), o = n % 10;
+    return NUM_WORDS_TENS[t] + (o ? '-' + NUM_WORDS_ONES[o] : '');
+}
+
+function threeDigitWords(n) {
+    const h = Math.floor(n / 100), rest = n % 100;
+    let s = '';
+    if (h) s += NUM_WORDS_ONES[h] + ' Hundred';
+    if (rest) s += (s ? ' ' : '') + twoDigitWords(rest);
+    return s;
+}
+
+// Indian numbering system: ...crore, lakh, thousand, hundred.
+function numberToWordsIndian(num) {
+    num = Math.floor(num);
+    if (num === 0) return 'Zero';
+    let n = num;
+    const crore = Math.floor(n / 10000000); n %= 10000000;
+    const lakh = Math.floor(n / 100000); n %= 100000;
+    const thousand = Math.floor(n / 1000); n %= 1000;
+    const hundred = n;
+
+    const parts = [];
+    if (crore) parts.push(threeDigitWords(crore) + ' Crore');
+    if (lakh) parts.push(threeDigitWords(lakh) + ' Lakh');
+    if (thousand) parts.push(threeDigitWords(thousand) + ' Thousand');
+    if (hundred) parts.push(threeDigitWords(hundred));
+    return parts.join(' ');
+}
+
+function amountToWords(amount) {
+    const rupees = Math.floor(amount);
+    const paise = Math.round((amount - rupees) * 100);
+    let words = numberToWordsIndian(rupees) + ' Rs';
+    if (paise > 0) {
+        words += ` and ${numberToWordsIndian(paise)} Paise`;
+    }
+    return words;
+}
+
+function formatIndianCommas(n) {
+    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function updateAmountPreview() {
+    const raw = inputValue.value;
+    const val = parseFloat(raw);
+
+    if (!raw || isNaN(val) || val <= 0) {
+        amountPreviewBox.classList.remove('visible');
+        amountPreviewMain.textContent = '';
+        amountPreviewWords.textContent = '';
+        return;
+    }
+
+    if (modePicker.get() === 'VOLUME') {
+        amountPreviewMain.textContent = `${formatIndianCommas(val)} ltr`;
+        amountPreviewWords.textContent = '';
+    } else {
+        amountPreviewMain.textContent = `₹${formatIndianCommas(val)}`;
+        amountPreviewWords.textContent = amountToWords(val);
+    }
+    amountPreviewBox.classList.add('visible');
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -275,6 +355,20 @@ printBtn.addEventListener('click', async () => {
     vehicleNoInput.value = '';
     mobileNoInput.value = '';
     backdateRateInput.value = '';
+    updateAmountPreview();
+});
+
+// Belt-and-braces copy protection to match the CSS user-select:none above —
+// blocks copy/cut of anything outside a real input/textarea field, even if
+// triggered via keyboard shortcut or browser extension rather than a mouse
+// selection.
+document.addEventListener('copy', (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
+});
+document.addEventListener('cut', (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA') e.preventDefault();
 });
 
 async function notifyBillCreated(transactionId) {

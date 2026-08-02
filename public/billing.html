@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="loader-active">
+<body class="loader-active billing-page">
 
     <div id="page-loader">
         <div class="page-loader-mark">
@@ -61,6 +61,11 @@
                     <span id="input-value-label">Enter Volume (Liters)</span>
                     <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
                 </label>
+
+                <div class="amount-preview-box" id="amount-preview-box">
+                    <div class="amount-preview-main" id="amount-preview-main"></div>
+                    <div class="amount-preview-words" id="amount-preview-words"></div>
+                </div>
             </div>
 
             <div class="settings-block">

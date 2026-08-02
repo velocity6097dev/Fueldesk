@@ -14,6 +14,8 @@
   --amber-bg: #FBEEDD;
   --red: #B23A34;
   --red-bg: #FBEAE9;
+  --yellow: #D4A600;
+  --yellow-bg: #FFF9DB;
   --header-fill: #D9E2F3;
   --banner-fill: #2E75B6;
   --radius: 8px;
@@ -51,14 +53,15 @@ svg { display: block; }
   padding: 11px 16px;
   font-size: 14px;
   font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
-.btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--amber); color: #fff; }
-.btn-primary:hover { background: var(--amber-dark); }
+.btn:active { transform: translateY(1px) scale(0.98); }
+.btn-primary { background: var(--amber); color: #fff; box-shadow: 0 4px 12px rgba(201,122,33,0.28); }
+.btn-primary:hover { background: var(--amber-dark); box-shadow: 0 6px 16px rgba(201,122,33,0.34); transform: translateY(-1px); }
+.btn-primary:active { box-shadow: 0 2px 6px rgba(201,122,33,0.24); transform: translateY(1px) scale(0.98); }
 .btn-secondary { background: var(--navy); color: #fff; }
-.btn-secondary:hover { background: var(--navy-dark); }
+.btn-secondary:hover { background: var(--navy-dark); transform: translateY(-1px); }
 .btn-ghost { background: transparent; color: var(--navy); border-color: var(--line); }
 .btn-ghost:hover { background: var(--line-soft); }
 .btn-block { width: 100%; }
@@ -67,6 +70,7 @@ svg { display: block; }
 .btn-icon-danger {
   border: none; background: transparent; color: var(--ink-soft);
   font-size: 15px; line-height: 1; padding: 6px 8px; border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .btn-icon-danger:hover { background: var(--red-bg); color: var(--red); }
 
@@ -81,9 +85,22 @@ svg { display: block; }
   border: 1px solid var(--line); background: var(--paper); color: var(--navy);
   border-radius: 10px; width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 .icon-btn:hover { background: var(--line-soft); }
+.icon-btn:active { transform: scale(0.92); }
 .icon-btn svg { width: 18px; height: 18px; }
+
+/* Keyboard focus for every button-like control — was previously missing,
+   so tabbing through fell back to the browser's default blue outline,
+   which clashed with the navy/amber palette. */
+.btn:focus-visible,
+.icon-btn:focus-visible,
+.picker-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--amber);
+}
+.btn-primary:focus-visible { box-shadow: 0 0 0 2px var(--amber), 0 0 0 4px var(--amber-bg); }
 
 /* ---------------- Fields ---------------- */
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-soft); }
@@ -101,6 +118,32 @@ svg { display: block; }
 }
 .field textarea { resize: vertical; min-height: 56px; }
 .field input:focus, .field textarea:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
+
+/* Live amount/volume preview shown under the entry field */
+.amount-preview-box {
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--yellow-bg);
+  border: 1.5px solid var(--yellow);
+  border-radius: var(--radius);
+}
+.amount-preview-box.visible { display: flex; }
+.amount-preview-main {
+  font-family: var(--font-mono);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.amount-preview-words {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-soft);
+  line-height: 1.35;
+}
+.amount-preview-words:empty { display: none; }
 
 /* Password field with a show/hide eye button */
 .pw-wrap { position: relative; }
@@ -178,7 +221,7 @@ svg { display: block; }
 .app-screen { min-height: 100vh; display: flex; flex-direction: column; }
 
 .app-topbar {
-  background: var(--navy);
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
   color: #fff;
   padding: calc(14px + var(--safe-top)) 18px 14px;
   position: sticky;
@@ -188,13 +231,65 @@ svg { display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 rgba(11,53,86,0);
+  transition: box-shadow 0.25s ease;
 }
-.topbar-text strong { display: block; font-family: var(--font-display); font-size: 16px; }
-.topbar-sub { font-size: 12px; color: #C9D6E0; }
+/* Soft ambient glow, echoes the amber radial used on the auth screen so
+   the two feel like one visual language. Purely decorative, sits behind
+   the content. */
+.app-topbar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 88% -20%, rgba(201,122,33,0.35), transparent 55%);
+  pointer-events: none;
+}
+/* A thin amber line along the bottom edge with a slow ambient sweep —
+   a nod to a flowing fuel line / gauge rather than decoration for its
+   own sake. Very slow and low-contrast so it never competes with the
+   content above it. */
+.app-topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--amber) 45%, #FFD873 50%, var(--amber) 55%, transparent);
+  background-size: 220% 100%;
+  animation: topbar-line-sweep 7s ease-in-out infinite;
+}
+@keyframes topbar-line-sweep {
+  0% { background-position: 100% 0; }
+  50% { background-position: 0% 0; }
+  100% { background-position: 100% 0; }
+}
+/* Once the page has scrolled under the sticky bar, lift it off the
+   content with a real shadow (class toggled by ui.js). */
+.app-topbar.is-scrolled { box-shadow: 0 6px 18px rgba(8,39,65,0.28); }
+
+.topbar-text, .role-badge { position: relative; z-index: 1; } /* sit above ::before glow */
+.topbar-text strong {
+  display: block; font-family: var(--font-display); font-size: 16px;
+  animation: topbar-in 0.32s ease both;
+}
+.topbar-sub {
+  font-size: 12px; color: #C9D6E0;
+  animation: topbar-in 0.32s ease 0.03s both;
+}
+@keyframes topbar-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
 .role-badge {
   font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
-  background: rgba(255,255,255,0.14); color: #fff; white-space: nowrap; flex-shrink: 0;
+  background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22);
+  color: #fff; white-space: nowrap; flex-shrink: 0;
+  animation: topbar-badge-in 0.3s ease 0.08s both;
 }
+@keyframes topbar-badge-in { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+
+/* Logout / ghost buttons living inside the navy topbar want a white-tinted
+   hover instead of the light-gray one meant for paper backgrounds. */
+.app-topbar .btn-ghost { transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease; }
+.app-topbar .btn-ghost:hover { background: rgba(255,255,255,0.14); }
 
 .app-main {
   flex: 1;
@@ -260,16 +355,42 @@ svg { display: block; }
   padding: 6px 4px calc(6px + var(--safe-bottom));
   z-index: 30;
   box-shadow: 0 -4px 16px rgba(11,53,86,0.06);
+  animation: bottom-nav-in 0.26s ease both;
 }
+@keyframes bottom-nav-in { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+
 .nav-btn {
   flex: 1; border: none; background: transparent;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 6px 2px; border-radius: 10px; color: var(--ink-soft);
+  position: relative;
+  transition: color 0.15s ease, transform 0.1s ease;
 }
-.nav-btn svg { width: 21px; height: 21px; }
-.nav-btn span { font-size: 10px; font-weight: 600; }
+.nav-btn svg { width: 21px; height: 21px; position: relative; z-index: 1; transition: transform 0.15s ease; }
+.nav-btn span { font-size: 10px; font-weight: 600; position: relative; z-index: 1; }
+.nav-btn:hover { color: var(--navy); }
+.nav-btn:active { transform: scale(0.93); }
+.nav-btn:active svg { transform: scale(0.9); }
+.nav-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--amber);
+}
+
+/* Amber pill behind the active tab's icon, popping in with a little
+   overshoot the moment the page renders it (each tab is its own page
+   load, so this plays once on arrival rather than sliding between tabs). */
 .nav-btn.active { color: var(--amber-dark); }
-.nav-btn:active { background: var(--line-soft); }
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 1px; left: 50%;
+  width: 34px; height: 34px;
+  transform: translateX(-50%) scale(0);
+  background: var(--amber-bg);
+  border-radius: 10px;
+  animation: nav-pill-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both;
+}
+@keyframes nav-pill-in { to { transform: translateX(-50%) scale(1); } }
 
 /* ---------------- Floating action button ---------------- */
 .fab {
@@ -530,8 +651,11 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
   background: rgba(255,255,255,0.14); border: none; color: #fff;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
+  position: relative; z-index: 1;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
-.topbar-icon-btn:active { background: rgba(255,255,255,0.26); }
+.topbar-icon-btn:hover { background: rgba(255,255,255,0.22); }
+.topbar-icon-btn:active { background: rgba(255,255,255,0.28); transform: scale(0.92); }
 .topbar-icon-btn svg { width: 17px; height: 17px; }
 
 /* ---------------- Segmented control (e.g. logo alignment) ---------------- */
@@ -765,4 +889,36 @@ body.loader-active {
 }
 @keyframes page-loader-spin {
   to { transform: rotate(360deg); }
+}
+/* ---------------- Copy protection (Billing entry screen only) ---------------- */
+/* Ordinary text (labels, buttons, headings, receipt preview, etc.) can't be
+   selected/copied. Actual input fields stay fully selectable & copyable. */
+body.billing-page,
+body.billing-page * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+body.billing-page input,
+body.billing-page textarea {
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* ---------------- Keyboard focus (topbar buttons) ---------------- */
+/* Buttons had no focus style of their own and fell back to the browser's
+   default blue outline, which clashes with the navy/amber palette. */
+.topbar-icon-btn:focus-visible,
+.app-topbar .btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--navy), 0 0 0 4px var(--amber);
+}
+
+/* ---------------- Respect reduced-motion preference ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .app-topbar::after { animation: none; }
+  .topbar-text strong, .topbar-sub, .role-badge { animation: none; }
+  .bottom-nav { animation: none; }
+  .nav-btn.active::before { animation: none; transform: translateX(-50%) scale(1); }
 }
