@@ -1,3 +1,489 @@
+// // Discord integration + scheduled jobs. Everything here is server-side
+// // only — the webhook URL lives in the `integrations` table, which has
+// // no RLS policies for any browser client (see sql/schema.sql section 5).
+// //
+// // Requires Node 18+ for the built-in `fetch`.
+
+// const cron = require('node-cron');
+// const { Queue, Worker, UnrecoverableError } = require('bullmq');
+// const IORedis = require('ioredis');
+
+// const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+// const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+// const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // Asia/Kolkata, fixed, no DST
+
+// function sleep(ms) {
+//     return new Promise((resolve) => setTimeout(resolve, ms));
+// }
+
+// // Per-fuel look for the "New Bill" embed — distinct emoji + sidebar
+// // color so a scrolling Discord channel is scannable at a glance.
+// const PRODUCT_META = {
+//     MS: { label: 'Petrol (MS)', emoji: '⛽', color: 0x16a34a },
+//     HSD: { label: 'Diesel (HSD)', emoji: '🛢️', color: 0x2563eb },
+//     PREMIUM: { label: 'Premium', emoji: '✨', color: 0xca8a04 },
+// };
+// function productMeta(product) {
+//     return PRODUCT_META[product] || { label: product || 'Fuel', emoji: '⛽', color: 0xd97706 };
+// }
+
+// // bill_time is stored as "HH:MM" (24h, the station device's local
+// // clock — that's IST for a station physically in India). Discord's
+// // own embed timestamp auto-converts to each viewer's own timezone,
+// // which is exactly what we DON'T want for a "what time was this
+// // printed" field, so we render it explicitly instead.
+// function to12Hour(hhmm) {
+//     if (!hhmm || !hhmm.includes(':')) return hhmm || '—';
+//     const [h, m] = hhmm.split(':').map(Number);
+//     if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+//     const period = h >= 12 ? 'PM' : 'AM';
+//     const h12 = ((h + 11) % 12) + 1;
+//     return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+// }
+
+// // Start of "today" as an ISO instant, computed against IST regardless
+// // of what timezone the server process itself runs in.
+// function startOfTodayIST() {
+//     const istNow = new Date(Date.now() + IST_OFFSET_MS);
+//     const istMidnightUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET_MS;
+//     return new Date(istMidnightUtcMs).toISOString();
+// }
+
+// // Start of the current ISO week (Monday) at 00:00 IST — this is the
+// // value the "weekly reset" pointer should hold, not the exact instant
+// // the summary happened to be sent.
+// function startOfWeekIST(date = new Date()) {
+//     const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+//     const dow = istNow.getUTCDay(); // Sun=0 ... Sat=6 (IST wall-clock day)
+//     const daysSinceMonday = (dow + 6) % 7; // Mon=0, Tue=1, ..., Sun=6
+//     const istMondayUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate() - daysSinceMonday);
+//     return new Date(istMondayUtcMs - IST_OFFSET_MS).toISOString();
+// }
+
+// // Start of the current calendar month, 1st at 00:00 IST — same idea
+// // for the "monthly reset" pointer.
+// function startOfMonthIST(date = new Date()) {
+//     const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+//     const istFirstUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), 1);
+//     return new Date(istFirstUtcMs - IST_OFFSET_MS).toISOString();
+// }
+
+// function createDiscordIntegration(supabaseAdmin) {
+//     // ---------------------------------------------------------------
+//     // Delivery queue — backed by Redis via BullMQ instead of a plain
+//     // in-memory array. The in-memory version lost whatever was still
+//     // queued any time the Node process restarted (crash, redeploy,
+//     // `nodemon` reload, host reboot) — those bills were gone for good
+//     // since nothing outside process memory remembered them. Redis
+//     // fixes that: a job only disappears once it has actually been
+//     // POSTed to Discord successfully.
+//     //
+//     // Same guarantees as before, still enforced:
+//     //   1. Order: the Worker below runs with concurrency: 1, so jobs
+//     //      are sent one at a time in the order they were added — bill
+//     //      #1 always reaches Discord before bill #2.
+//     //   2. No missing bills: a `limiter` paces sends under Discord's
+//     //      rate limit, and an actual 429 pauses the worker for exactly
+//     //      the `retry_after` Discord asks for and retries that same
+//     //      job — it isn't dropped, it just waits.
+//     //
+//     // Requires a reachable Redis at REDIS_URL (see .env.example).
+//     // `maxRetriesPerRequest: null` is required by BullMQ on the
+//     // connection it hands to a Worker (blocking commands need to be
+//     // allowed to keep retrying rather than give up after N tries).
+//     // ---------------------------------------------------------------
+//     const redisConnection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
+//         maxRetriesPerRequest: null,
+//     });
+//     redisConnection.on('error', (err) => console.error('Redis connection error (Discord queue):', err.message));
+
+//     const QUEUE_NAME = 'discord-notifications';
+//     const discordQueue = new Queue(QUEUE_NAME, {
+//     connection: redisConnection,
+//     streams: {
+//         events: {
+//             maxLen: 100, // auto-trims the events stream on every write
+//         },
+//     },
+//     });
+
+//     discordQueue.trimEvents(100).catch((e) => console.error('Could not trim Discord events stream:', e.message));
+
+//     async function enqueue(webhookUrl, payload) {
+//         await discordQueue.add(
+//             'send',
+//             { webhookUrl, payload },
+//             {
+//                 attempts: 10,
+//                 backoff: { type: 'exponential', delay: 3000 },
+//                 // Success -> delete the job from Redis right away. Nothing
+//                 // accumulates in the DB once a bill has actually gone out.
+//                 removeOnComplete: true,
+//                 // Failure (all 10 attempts exhausted, or an unrecoverable
+//                 // one like a dead webhook URL) -> don't delete instantly,
+//                 // but don't keep it forever either. It sticks around for
+//                 // 24h so you (or the 'failed' log line above) can see what
+//                 // went wrong, then Redis cleans it up on its own — no
+//                 // manual maintenance needed either way.
+//                 removeOnFail: { age: 24 * 60 * 60 },
+//             }
+//         );
+//     }
+
+//     const discordWorker = new Worker(
+//         QUEUE_NAME,
+//         async (job) => {
+//             const { webhookUrl, payload } = job.data;
+
+//             // Discord webhooks normally respond in well under a second.
+//             // Without a timeout, a hung TCP connection (blocked outbound
+//             // traffic, a flaky network, etc.) would leave the job stuck in
+//             // "active" forever with nothing logged and nothing retried —
+//             // exactly the kind of silent stall this queue is meant to
+//             // prevent. 15s is generous; anything past that, fail and retry.
+//             const controller = new AbortController();
+//             const timeout = setTimeout(() => controller.abort(), 15000);
+//             let res;
+//             try {
+//                 res = await fetch(webhookUrl, {
+//                     method: 'POST',
+//                     headers: { 'Content-Type': 'application/json' },
+//                     body: JSON.stringify(payload),
+//                     signal: controller.signal,
+//                 });
+//             } finally {
+//                 clearTimeout(timeout);
+//             }
+
+//             if (res.status === 429) {
+//                 const body = await res.json().catch(() => ({}));
+//                 const retryAfterMs = Math.ceil((body.retry_after ?? 1) * 1000) + 250;
+//                 // Pause the whole worker for exactly as long as Discord
+//                 // asked, then this same job is retried first. A RateLimitError
+//                 // doesn't count against `attempts` above, so a busy channel
+//                 // never burns through the retry budget meant for real failures.
+//                 await discordWorker.rateLimit(retryAfterMs);
+//                 throw Worker.RateLimitError();
+//             }
+
+//             if (res.status === 404 || res.status === 401) {
+//                 // Webhook was deleted or regenerated in Discord — retrying
+//                 // won't fix that until someone updates the URL, so stop
+//                 // immediately instead of burning all 10 attempts on it.
+//                 throw new UnrecoverableError(
+//                     `Discord webhook rejected the request (${res.status}) — check the webhook URL in Settings -> Integrations.`
+//                 );
+//             }
+
+//             if (!res.ok) {
+//                 const text = await res.text().catch(() => '');
+//                 throw new Error(`Discord responded with ${res.status}: ${text}`);
+//             }
+//         },
+//         {
+//             connection: redisConnection,
+//             concurrency: 1, // one send in flight at a time -> preserves order
+//             limiter: { max: 5, duration: 2000 }, // stay comfortably under Discord's rate limit
+//         }
+//     );
+
+//     // Fires on EVERY failed attempt, not just the last one — so this is
+//     // exactly where to look, live, when something isn't sending. It'll
+//     // print the real error (timeout, DNS failure, Discord's response body,
+//     // etc.) right when it happens instead of you having to guess.
+//     discordWorker.on('failed', (job, err) => {
+//         if (!job) return;
+//         const maxAttempts = job.opts?.attempts || 1;
+//         if (job.attemptsMade < maxAttempts) {
+//             console.warn(`Discord job ${job.id} attempt ${job.attemptsMade}/${maxAttempts} failed, retrying: ${err.message}`);
+//         } else {
+//             console.error(`Discord job ${job.id} failed permanently after ${job.attemptsMade} attempt(s): ${err.message}`);
+//         }
+//     });
+
+//     // Called from server.js on SIGINT/SIGTERM so Redis connections and
+//     // the worker's in-flight job close cleanly instead of just dying.
+//     async function shutdown() {
+//         await discordWorker.close();
+//         await discordQueue.close();
+//         redisConnection.disconnect();
+//     }
+
+//     async function sendWithRetry(webhookUrl, payload, attempt = 1) {
+//         const MAX_ATTEMPTS = 5;
+//         try {
+//             const res = await fetch(webhookUrl, {
+//                 method: 'POST',
+//                 headers: { 'Content-Type': 'application/json' },
+//                 body: JSON.stringify(payload),
+//             });
+
+//             if (res.status === 429) {
+//                 const body = await res.json().catch(() => ({}));
+//                 const retryAfterMs = Math.ceil((body.retry_after ?? 1) * 1000) + 250;
+//                 if (attempt < MAX_ATTEMPTS) {
+//                     console.warn(`Discord rate-limited us, retrying in ${retryAfterMs}ms (attempt ${attempt}/${MAX_ATTEMPTS})`);
+//                     await sleep(retryAfterMs);
+//                     return sendWithRetry(webhookUrl, payload, attempt + 1);
+//                 }
+//                 console.error('Discord webhook still rate-limited after max retries — message dropped.');
+//                 return { ok: false, error: 'Discord is rate-limiting this webhook — try again shortly.' };
+//             }
+
+//             if (!res.ok) {
+//                 const text = await res.text().catch(() => '');
+//                 if (attempt < MAX_ATTEMPTS) {
+//                     await sleep(1000 * attempt);
+//                     return sendWithRetry(webhookUrl, payload, attempt + 1);
+//                 }
+//                 console.error('Discord webhook failed permanently:', res.status, text);
+//                 return { ok: false, error: `Discord responded with ${res.status}` };
+//             }
+
+//             return { ok: true };
+//         } catch (err) {
+//             if (attempt < MAX_ATTEMPTS) {
+//                 await sleep(1000 * attempt);
+//                 return sendWithRetry(webhookUrl, payload, attempt + 1);
+//             }
+//             console.error('Could not reach Discord webhook after retries:', err.message);
+//             return { ok: false, error: err.message };
+//         }
+//     }
+
+//     async function getConfig() {
+//         const { data, error } = await supabaseAdmin.from('integrations').select('*').eq('id', 1).single();
+//         if (error) {
+//             console.error('Could not load integrations config:', error.message);
+//             return null;
+//         }
+//         return data;
+//     }
+
+//     // Display name lookup — Discord messages should show what staff
+//     // actually see on screen ("Logged in as ..."), not the login
+//     // username. attendant_username on the transaction is a stable
+//     // fallback (works even if the staff account was later deleted,
+//     // since attendant_id can be null then — see migration 008).
+//     async function resolveDisplayName(attendantId, fallbackUsername) {
+//         if (attendantId) {
+//             const { data } = await supabaseAdmin
+//                 .from('profiles')
+//                 .select('display_name, username')
+//                 .eq('id', attendantId)
+//                 .single();
+//             if (data) return data.display_name || data.username;
+//         }
+//         return fallbackUsername || 'Unknown';
+//     }
+
+//     async function notifyBillCreated(transaction) {
+//         const config = await getConfig();
+//         if (!config?.discord_enabled || !config?.discord_notify_bill_created || !config?.discord_webhook_url) return;
+
+//         const attendantName = await resolveDisplayName(transaction.attendant_id, transaction.attendant_username);
+//         const { label, emoji, color } = productMeta(transaction.product);
+//         const printedAt = `${transaction.bill_date ?? '—'} · ${to12Hour(transaction.bill_time)} IST`;
+
+//         const fields = [
+//             { name: '💰 Amount', value: `₹${Number(transaction.amount).toFixed(2)}`, inline: true },
+//             { name: '🧪 Volume', value: `${transaction.volume} L`, inline: true },
+//             { name: '💲 Rate', value: `₹${transaction.rate}/L`, inline: true },
+//             { name: '👤 Attendant', value: attendantName, inline: true },
+//             { name: '🚘 Vehicle No.', value: transaction.vehicle_no || '—', inline: true },
+//         ];
+//         if (transaction.mobile_no) {
+//             fields.push({ name: '📱 Mobile', value: transaction.mobile_no, inline: true });
+//         }
+//         fields.push({
+//             name: '🕒 Printed At (IST)',
+//             value: transaction.is_backdated ? `${printedAt}\n⚠️ *Backdated entry*` : printedAt,
+//             inline: false,
+//         });
+
+//         await enqueue(config.discord_webhook_url, {
+//             embeds: [{
+//                 author: { name: 'FuelDesk · New Bill' },
+//                 title: `${emoji}  ${label}`,
+//                 description: `Receipt **#${transaction.receipt_no ?? '—'}**`,
+//                 color,
+//                 fields,
+//                 footer: { text: 'FuelDesk' },
+//                 timestamp: new Date().toISOString(),
+//             }],
+//         });
+//     }
+
+//     // Super Admins can technically print a bill too (any active login
+//     // can), but "all staff" summaries should only reflect ADMIN_STAFF
+//     // and STATION_STAFF activity. Fetching the (small) set of Super
+//     // Admin ids and excluding just those, rather than requiring an
+//     // explicit allow-list, keeps deleted-staff bills (attendant_id
+//     // null, see migration 008) counted — we can't know their old role,
+//     // but they can't be the currently-active Super Admin's own bills.
+//     async function getSuperAdminIds() {
+//         const { data, error } = await supabaseAdmin.from('profiles').select('id').eq('role', 'SUPER_ADMIN');
+//         if (error) {
+//             console.error('Could not load Super Admin ids:', error.message);
+//             return [];
+//         }
+//         return (data || []).map((p) => p.id);
+//     }
+
+//     async function buildSummaryPayload(title, sinceIso, { excludeSuperAdmin = false } = {}) {
+//         const { data: rows, error } = await supabaseAdmin
+//             .from('transactions')
+//             .select('attendant_id, attendant_username, amount')
+//             .gte('created_at', sinceIso);
+
+//         if (error) {
+//             console.error('Could not load transactions for summary:', error.message);
+//             return null;
+//         }
+
+//         let scopedRows = rows;
+//         if (excludeSuperAdmin) {
+//             const superAdminIds = new Set(await getSuperAdminIds());
+//             scopedRows = rows.filter((r) => !(r.attendant_id && superAdminIds.has(r.attendant_id)));
+//         }
+
+//         // Batch-resolve display names for everyone involved, one query
+//         // instead of one per row.
+//         const attendantIds = [...new Set(scopedRows.map((r) => r.attendant_id).filter(Boolean))];
+//         const nameById = {};
+//         if (attendantIds.length > 0) {
+//             const { data: profiles } = await supabaseAdmin
+//                 .from('profiles')
+//                 .select('id, display_name, username')
+//                 .in('id', attendantIds);
+//             for (const p of profiles || []) {
+//                 nameById[p.id] = p.display_name || p.username;
+//             }
+//         }
+
+//         const totals = {};
+//         let grandTotal = 0;
+//         for (const row of scopedRows) {
+//             const name = (row.attendant_id && nameById[row.attendant_id]) || row.attendant_username || 'Unknown';
+//             totals[name] = (totals[name] || 0) + Number(row.amount);
+//             grandTotal += Number(row.amount);
+//         }
+
+//         const description = Object.entries(totals)
+//             .sort((a, b) => b[1] - a[1])
+//             .map(([name, amt]) => `**${name}** — ₹${amt.toFixed(2)}`)
+//             .join('\n') || 'No bills in this period.';
+
+//         return {
+//             embeds: [{
+//                 title,
+//                 color: 0x0b3556,
+//                 description,
+//                 fields: [
+//                     { name: '🧾 Total Bills', value: String(scopedRows.length), inline: true },
+//                     { name: '💰 Total Amount', value: `₹${grandTotal.toFixed(2)}`, inline: true },
+//                 ],
+//                 footer: { text: 'FuelDesk' },
+//                 timestamp: new Date().toISOString(),
+//             }],
+//         };
+//     }
+
+//     // Bumps a reset pointer column to the given ISO instant — the next
+//     // summary of that kind will only count bills from that point
+//     // forward, which is the "reset the count to 0" behaviour. The
+//     // stored value is always an IST calendar boundary (Monday 00:00 for
+//     // weekly, the 1st 00:00 for monthly), not the exact send instant,
+//     // so the numbers read cleanly on their own.
+//     async function resetPeriod(column, isoValue) {
+//         const { error } = await supabaseAdmin
+//             .from('integrations')
+//             .update({ [column]: isoValue })
+//             .eq('id', 1);
+//         if (error) console.error(`Could not reset ${column}:`, error.message);
+//     }
+
+//     async function sendWeeklySummary() {
+//         const config = await getConfig();
+//         if (!config?.discord_enabled || !config?.discord_notify_weekly_summary || !config?.discord_webhook_url) return;
+//         const since = config.discord_weekly_reset_at || new Date(Date.now() - ONE_WEEK_MS).toISOString();
+//         const payload = await buildSummaryPayload('📊 Weekly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+//         if (!payload) return;
+//         await enqueue(config.discord_webhook_url, payload);
+//         await resetPeriod('discord_weekly_reset_at', startOfWeekIST());
+//     }
+
+//     async function sendMonthlySummary() {
+//         const config = await getConfig();
+//         if (!config?.discord_enabled || !config?.discord_notify_monthly_summary || !config?.discord_webhook_url) return;
+//         const since = config.discord_monthly_reset_at || new Date(Date.now() - ONE_MONTH_MS).toISOString();
+//         const payload = await buildSummaryPayload('🗓️ Monthly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+//         if (!payload) return;
+//         await enqueue(config.discord_webhook_url, payload);
+//         await resetPeriod('discord_monthly_reset_at', startOfMonthIST());
+//     }
+
+//     // Manual, on-demand "today so far" summary for Admin Staff + Station
+//     // Staff (Super Admin's own bills, if any, excluded). Triggered from
+//     // Settings → Integrations, not on a schedule, and doesn't touch the
+//     // weekly/monthly reset pointers — "today" is naturally bounded by
+//     // IST midnight, so there's nothing to reset.
+//     async function sendTodaySummary() {
+//         const config = await getConfig();
+//         if (!config?.discord_enabled || !config?.discord_webhook_url) {
+//             throw new Error('Discord isn\'t enabled or configured yet — set a webhook URL and enable Discord first.');
+//         }
+//         const since = startOfTodayIST();
+//         const payload = await buildSummaryPayload('📅 Today\'s Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
+//         if (!payload) throw new Error('Could not build today\'s summary — check server logs.');
+
+//         // Sent directly (awaited), not through the queue — same reasoning
+//         // as sendTestMessage: this is a one-off manual action and the
+//         // admin wants to know right away whether it actually went out.
+//         const result = await sendWithRetry(config.discord_webhook_url, payload);
+//         if (!result.ok) throw new Error(result.error || 'Could not send summary');
+//     }
+
+//     async function sendTestMessage() {
+//         const config = await getConfig();
+//         if (!config?.discord_webhook_url) throw new Error('No webhook URL saved yet — enter one first.');
+//         // Sent directly (awaited), not through the queue — this is a
+//         // one-off user action that wants an immediate real result on
+//         // screen, not "queued, we'll see."
+//         const result = await sendWithRetry(config.discord_webhook_url, {
+//             content: '✅ FuelDesk is connected to this channel. Test message sent from Settings → Integrations.',
+//         });
+//         if (!result.ok) throw new Error(result.error || 'Could not send test message');
+//     }
+
+//     async function wipeOldTransactions() {
+//         const cutoff = new Date(Date.now() - ONE_MONTH_MS).toISOString();
+//         const { error, count } = await supabaseAdmin
+//             .from('transactions')
+//             .delete({ count: 'exact' })
+//             .lt('created_at', cutoff);
+//         if (error) console.error('Monthly transaction wipe failed:', error.message);
+//         else if (count) console.log(`Wiped ${count} transaction(s) older than 1 month.`);
+//     }
+
+//     // Daily wipe check at 2am, weekly summary Monday 9am, monthly summary
+//     // on the 1st at 9am — all server-local time. Only runs while the
+//     // Node process is up, like any cron job.
+//     function scheduleJobs() {
+//         cron.schedule('0 2 * * *', () => wipeOldTransactions().catch((e) => console.error('wipeOldTransactions error:', e)));
+//         cron.schedule('0 9 * * 1', () => sendWeeklySummary().catch((e) => console.error('sendWeeklySummary error:', e)));
+//         cron.schedule('0 9 1 * *', () => sendMonthlySummary().catch((e) => console.error('sendMonthlySummary error:', e)));
+//         console.log('Scheduled jobs: daily 1-month transaction wipe, weekly summary (Mon), monthly summary (1st).');
+//     }
+
+//     return { notifyBillCreated, sendTodaySummary, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs, shutdown };
+// }
+
+// module.exports = { createDiscordIntegration };
+
+
+
+
 // Discord integration + scheduled jobs. Everything here is server-side
 // only — the webhook URL lives in the `integrations` table, which has
 // no RLS policies for any browser client (see sql/schema.sql section 5).
@@ -98,16 +584,45 @@ function createDiscordIntegration(supabaseAdmin) {
     redisConnection.on('error', (err) => console.error('Redis connection error (Discord queue):', err.message));
 
     const QUEUE_NAME = 'discord-notifications';
+    // Every job (added -> waiting -> active -> completed -> removed)
+    // writes several entries here, so a handful of bills adds up fast.
+    const EVENTS_STREAM_KEY = `bull:${QUEUE_NAME}:events`;
+
     const discordQueue = new Queue(QUEUE_NAME, {
-    connection: redisConnection,
-    streams: {
-        events: {
-            maxLen: 100, // auto-trims the events stream on every write
+        connection: redisConnection,
+        streams: {
+            events: {
+                maxLen: 100, // auto-trims the events stream on every write
+            },
         },
-    },
     });
 
+    // One-time trim on boot. Uses Redis's *approximate* trimming under
+    // the hood (BullMQ always does), which only removes whole internal
+    // stream blocks (~100 entries each) — so it can leave the stream
+    // above 100 if the current entries don't line up on a block
+    // boundary yet. That's fine here; the exact daily trim below
+    // (trimEventsExact, wired into the 2am cron job) is what actually
+    // guarantees it lands on precisely 100 long-term.
     discordQueue.trimEvents(100).catch((e) => console.error('Could not trim Discord events stream:', e.message));
+
+    // Exact daily cleanup for the events stream. `maxLen: 100` above and
+    // the startup trimEvents() call both use Redis's approximate
+    // trimming, which can only delete whole ~100-entry blocks and will
+    // refuse to do so if it would undershoot the target — so the stream
+    // can drift up over 100 as bills come in between block boundaries.
+    // This does a real, exact XTRIM (no `~`) so it always lands on
+    // exactly 100, without needing a manual redis-cli command.
+    async function trimEventsExact() {
+        try {
+            const removed = await redisConnection.xtrim(EVENTS_STREAM_KEY, 'MAXLEN', 100);
+            if (removed) {
+                console.log(`Trimmed ${removed} old entr${removed === 1 ? 'y' : 'ies'} from the Discord events stream.`);
+            }
+        } catch (err) {
+            console.error('Could not exact-trim Discord events stream:', err.message);
+        }
+    }
 
     async function enqueue(webhookUrl, payload) {
         await discordQueue.add(
@@ -466,17 +981,30 @@ function createDiscordIntegration(supabaseAdmin) {
         else if (count) console.log(`Wiped ${count} transaction(s) older than 1 month.`);
     }
 
-    // Daily wipe check at 2am, weekly summary Monday 9am, monthly summary
-    // on the 1st at 9am — all server-local time. Only runs while the
-    // Node process is up, like any cron job.
+    // Daily wipe + exact events-stream trim at 2am, weekly summary Monday
+    // 9am, monthly summary on the 1st at 9am — all server-local time.
+    // Only runs while the Node process is up, like any cron job.
     function scheduleJobs() {
-        cron.schedule('0 2 * * *', () => wipeOldTransactions().catch((e) => console.error('wipeOldTransactions error:', e)));
+        cron.schedule('0 2 * * *', () => {
+            wipeOldTransactions().catch((e) => console.error('wipeOldTransactions error:', e));
+            trimEventsExact().catch((e) => console.error('trimEventsExact error:', e));
+        });
         cron.schedule('0 9 * * 1', () => sendWeeklySummary().catch((e) => console.error('sendWeeklySummary error:', e)));
         cron.schedule('0 9 1 * *', () => sendMonthlySummary().catch((e) => console.error('sendMonthlySummary error:', e)));
-        console.log('Scheduled jobs: daily 1-month transaction wipe, weekly summary (Mon), monthly summary (1st).');
+        console.log('Scheduled jobs: daily 1-month transaction wipe + events stream trim, weekly summary (Mon), monthly summary (1st).');
     }
 
-    return { notifyBillCreated, sendTodaySummary, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs, shutdown };
+    return {
+        notifyBillCreated,
+        sendTodaySummary,
+        sendWeeklySummary,
+        sendMonthlySummary,
+        sendTestMessage,
+        wipeOldTransactions,
+        trimEventsExact,
+        scheduleJobs,
+        shutdown,
+    };
 }
 
 module.exports = { createDiscordIntegration };
