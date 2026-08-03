@@ -34,6 +34,18 @@ const app = express();
 app.use(express.json());
 
 // ---------------------------------------------------------------
+// Health check for uptime monitors (UptimeRobot, cron-job.org, etc.)
+// keeping a free Render instance from sleeping. Deliberately does
+// nothing but respond — no Supabase query, no Redis round-trip — so
+// a ping every few minutes costs nothing and can never itself become
+// a load problem or fail because a dependency is briefly down.
+// ---------------------------------------------------------------
+app.get('/health', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({ ok: true });
+});
+
+// ---------------------------------------------------------------
 // Public runtime config for the browser (anon key only — this key
 // is meant to be public, Row Level Security is what protects data).
 // ---------------------------------------------------------------
