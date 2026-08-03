@@ -110,11 +110,13 @@ function createDiscordIntegration(supabaseAdmin) {
                 // Success -> delete the job from Redis right away. Nothing
                 // accumulates in the DB once a bill has actually gone out.
                 removeOnComplete: true,
-                // Failure -> keep the last 200 around instead of wiping
-                // them, so a broken webhook URL or a long Discord outage
-                // is still visible in Redis for debugging, but capped so
-                // it can't grow forever.
-                removeOnFail: { count: 200 },
+                // Failure (all 10 attempts exhausted, or an unrecoverable
+                // one like a dead webhook URL) -> don't delete instantly,
+                // but don't keep it forever either. It sticks around for
+                // 24h so you (or the 'failed' log line above) can see what
+                // went wrong, then Redis cleans it up on its own — no
+                // manual maintenance needed either way.
+                removeOnFail: { age: 24 * 60 * 60 },
             }
         );
     }
@@ -123,11 +125,26 @@ function createDiscordIntegration(supabaseAdmin) {
         QUEUE_NAME,
         async (job) => {
             const { webhookUrl, payload } = job.data;
-            const res = await fetch(webhookUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+
+            // Discord webhooks normally respond in well under a second.
+            // Without a timeout, a hung TCP connection (blocked outbound
+            // traffic, a flaky network, etc.) would leave the job stuck in
+            // "active" forever with nothing logged and nothing retried —
+            // exactly the kind of silent stall this queue is meant to
+            // prevent. 15s is generous; anything past that, fail and retry.
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            let res;
+            try {
+                res = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal,
+                });
+            } finally {
+                clearTimeout(timeout);
+            }
 
             if (res.status === 429) {
                 const body = await res.json().catch(() => ({}));
@@ -161,8 +178,18 @@ function createDiscordIntegration(supabaseAdmin) {
         }
     );
 
+    // Fires on EVERY failed attempt, not just the last one — so this is
+    // exactly where to look, live, when something isn't sending. It'll
+    // print the real error (timeout, DNS failure, Discord's response body,
+    // etc.) right when it happens instead of you having to guess.
     discordWorker.on('failed', (job, err) => {
-        console.error(`Discord job ${job?.id} failed permanently after ${job?.attemptsMade} attempt(s):`, err.message);
+        if (!job) return;
+        const maxAttempts = job.opts?.attempts || 1;
+        if (job.attemptsMade < maxAttempts) {
+            console.warn(`Discord job ${job.id} attempt ${job.attemptsMade}/${maxAttempts} failed, retrying: ${err.message}`);
+        } else {
+            console.error(`Discord job ${job.id} failed permanently after ${job.attemptsMade} attempt(s): ${err.message}`);
+        }
     });
 
     // Called from server.js on SIGINT/SIGTERM so Redis connections and

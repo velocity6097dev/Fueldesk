@@ -1,0 +1,9 @@
+
+velocity607.dev@gmail.com
+
+redis config 
+
+database name = Fueldesk4omni
+ver = 8.6 
+cloud vendor = google cloud
+region = asia pacific (mumbai) asia south1
