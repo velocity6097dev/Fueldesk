@@ -98,7 +98,16 @@ function createDiscordIntegration(supabaseAdmin) {
     redisConnection.on('error', (err) => console.error('Redis connection error (Discord queue):', err.message));
 
     const QUEUE_NAME = 'discord-notifications';
-    const discordQueue = new Queue(QUEUE_NAME, { connection: redisConnection });
+    const discordQueue = new Queue(QUEUE_NAME, {
+    connection: redisConnection,
+    streams: {
+        events: {
+            maxLen: 100, // auto-trims the events stream on every write
+        },
+    },
+    });
+
+    discordQueue.trimEvents(100).catch((e) => console.error('Could not trim Discord events stream:', e.message));
 
     async function enqueue(webhookUrl, payload) {
         await discordQueue.add(
