@@ -435,3 +435,18 @@ app.listen(PORT, () => {
     console.log(`- Admin:   http://localhost:${PORT}/admin.html`);
     discord.scheduleJobs();
 });
+
+// Close the BullMQ worker/queue and Redis connection cleanly on
+// restart/redeploy (e.g. `pm2 restart`, Docker stop, Ctrl+C) instead of
+// just killing the process mid-job.
+async function gracefulShutdown(signal) {
+    console.log(`\n${signal} received, shutting down...`);
+    try {
+        await discord.shutdown();
+    } catch (err) {
+        console.error('Error while shutting down Discord queue:', err.message);
+    }
+    process.exit(0);
+}
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

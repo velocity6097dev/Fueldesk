@@ -5,6 +5,8 @@
 // Requires Node 18+ for the built-in `fetch`.
 
 const cron = require('node-cron');
+const { Queue, Worker, UnrecoverableError } = require('bullmq');
+const IORedis = require('ioredis');
 
 const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -68,36 +70,107 @@ function startOfMonthIST(date = new Date()) {
 
 function createDiscordIntegration(supabaseAdmin) {
     // ---------------------------------------------------------------
-    // Delivery queue. Every message goes through here, one at a time,
-    // in the order it was enqueued — never sent concurrently. Two
-    // problems this fixes on its own:
-    //   1. Messages arriving out of order: firing several webhook POSTs
-    //      concurrently doesn't guarantee they land at Discord in the
-    //      order you sent them, since network timing isn't guaranteed.
-    //      A single sequential worker guarantees send order.
-    //   2. Missing bills: Discord webhooks are rate-limited (roughly
-    //      5 requests / 2 seconds). Several bills printed back-to-back
-    //      as fire-and-forget POSTs could get 429'd and silently
-    //      dropped. The queue paces sends and retries on 429 (honoring
-    //      Discord's retry_after) and on transient network errors.
+    // Delivery queue — backed by Redis via BullMQ instead of a plain
+    // in-memory array. The in-memory version lost whatever was still
+    // queued any time the Node process restarted (crash, redeploy,
+    // `nodemon` reload, host reboot) — those bills were gone for good
+    // since nothing outside process memory remembered them. Redis
+    // fixes that: a job only disappears once it has actually been
+    // POSTed to Discord successfully.
+    //
+    // Same guarantees as before, still enforced:
+    //   1. Order: the Worker below runs with concurrency: 1, so jobs
+    //      are sent one at a time in the order they were added — bill
+    //      #1 always reaches Discord before bill #2.
+    //   2. No missing bills: a `limiter` paces sends under Discord's
+    //      rate limit, and an actual 429 pauses the worker for exactly
+    //      the `retry_after` Discord asks for and retries that same
+    //      job — it isn't dropped, it just waits.
+    //
+    // Requires a reachable Redis at REDIS_URL (see .env.example).
+    // `maxRetriesPerRequest: null` is required by BullMQ on the
+    // connection it hands to a Worker (blocking commands need to be
+    // allowed to keep retrying rather than give up after N tries).
     // ---------------------------------------------------------------
-    const queue = [];
-    let draining = false;
+    const redisConnection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
+        maxRetriesPerRequest: null,
+    });
+    redisConnection.on('error', (err) => console.error('Redis connection error (Discord queue):', err.message));
 
-    function enqueue(webhookUrl, payload) {
-        queue.push({ webhookUrl, payload });
-        drainQueue();
+    const QUEUE_NAME = 'discord-notifications';
+    const discordQueue = new Queue(QUEUE_NAME, { connection: redisConnection });
+
+    async function enqueue(webhookUrl, payload) {
+        await discordQueue.add(
+            'send',
+            { webhookUrl, payload },
+            {
+                attempts: 10,
+                backoff: { type: 'exponential', delay: 3000 },
+                // Success -> delete the job from Redis right away. Nothing
+                // accumulates in the DB once a bill has actually gone out.
+                removeOnComplete: true,
+                // Failure -> keep the last 200 around instead of wiping
+                // them, so a broken webhook URL or a long Discord outage
+                // is still visible in Redis for debugging, but capped so
+                // it can't grow forever.
+                removeOnFail: { count: 200 },
+            }
+        );
     }
 
-    async function drainQueue() {
-        if (draining) return;
-        draining = true;
-        while (queue.length > 0) {
-            const job = queue.shift();
-            await sendWithRetry(job.webhookUrl, job.payload);
-            await sleep(700); // stay comfortably under Discord's rate limit between sends
+    const discordWorker = new Worker(
+        QUEUE_NAME,
+        async (job) => {
+            const { webhookUrl, payload } = job.data;
+            const res = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (res.status === 429) {
+                const body = await res.json().catch(() => ({}));
+                const retryAfterMs = Math.ceil((body.retry_after ?? 1) * 1000) + 250;
+                // Pause the whole worker for exactly as long as Discord
+                // asked, then this same job is retried first. A RateLimitError
+                // doesn't count against `attempts` above, so a busy channel
+                // never burns through the retry budget meant for real failures.
+                await discordWorker.rateLimit(retryAfterMs);
+                throw Worker.RateLimitError();
+            }
+
+            if (res.status === 404 || res.status === 401) {
+                // Webhook was deleted or regenerated in Discord — retrying
+                // won't fix that until someone updates the URL, so stop
+                // immediately instead of burning all 10 attempts on it.
+                throw new UnrecoverableError(
+                    `Discord webhook rejected the request (${res.status}) — check the webhook URL in Settings -> Integrations.`
+                );
+            }
+
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                throw new Error(`Discord responded with ${res.status}: ${text}`);
+            }
+        },
+        {
+            connection: redisConnection,
+            concurrency: 1, // one send in flight at a time -> preserves order
+            limiter: { max: 5, duration: 2000 }, // stay comfortably under Discord's rate limit
         }
-        draining = false;
+    );
+
+    discordWorker.on('failed', (job, err) => {
+        console.error(`Discord job ${job?.id} failed permanently after ${job?.attemptsMade} attempt(s):`, err.message);
+    });
+
+    // Called from server.js on SIGINT/SIGTERM so Redis connections and
+    // the worker's in-flight job close cleanly instead of just dying.
+    async function shutdown() {
+        await discordWorker.close();
+        await discordQueue.close();
+        redisConnection.disconnect();
     }
 
     async function sendWithRetry(webhookUrl, payload, attempt = 1) {
@@ -192,7 +265,7 @@ function createDiscordIntegration(supabaseAdmin) {
             inline: false,
         });
 
-        enqueue(config.discord_webhook_url, {
+        await enqueue(config.discord_webhook_url, {
             embeds: [{
                 author: { name: 'FuelDesk · New Bill' },
                 title: `${emoji}  ${label}`,
@@ -300,7 +373,7 @@ function createDiscordIntegration(supabaseAdmin) {
         const since = config.discord_weekly_reset_at || new Date(Date.now() - ONE_WEEK_MS).toISOString();
         const payload = await buildSummaryPayload('📊 Weekly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
         if (!payload) return;
-        enqueue(config.discord_webhook_url, payload);
+        await enqueue(config.discord_webhook_url, payload);
         await resetPeriod('discord_weekly_reset_at', startOfWeekIST());
     }
 
@@ -310,7 +383,7 @@ function createDiscordIntegration(supabaseAdmin) {
         const since = config.discord_monthly_reset_at || new Date(Date.now() - ONE_MONTH_MS).toISOString();
         const payload = await buildSummaryPayload('🗓️ Monthly Summary (Admin & Staff)', since, { excludeSuperAdmin: true });
         if (!payload) return;
-        enqueue(config.discord_webhook_url, payload);
+        await enqueue(config.discord_webhook_url, payload);
         await resetPeriod('discord_monthly_reset_at', startOfMonthIST());
     }
 
@@ -367,7 +440,7 @@ function createDiscordIntegration(supabaseAdmin) {
         console.log('Scheduled jobs: daily 1-month transaction wipe, weekly summary (Mon), monthly summary (1st).');
     }
 
-    return { notifyBillCreated, sendTodaySummary, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs };
+    return { notifyBillCreated, sendTodaySummary, sendWeeklySummary, sendMonthlySummary, sendTestMessage, wipeOldTransactions, scheduleJobs, shutdown };
 }
 
 module.exports = { createDiscordIntegration };
