@@ -498,6 +498,14 @@ const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // Asia/Kolkata, fixed, no DST
 
+// node-cron's own timezone option, used below when scheduling jobs.
+// This is what actually makes cron fire at a fixed IST wall-clock time
+// no matter what timezone the host OS/container is set to — without
+// it, '50 2 * * *' would fire at 2:50am in *whatever* TZ the server
+// process happens to run in (commonly UTC on most hosts/PaaS), which
+// is 8:20am IST, not 2:50am IST.
+const CRON_TZ = 'Asia/Kolkata';
+
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -602,8 +610,8 @@ function createDiscordIntegration(supabaseAdmin) {
     // stream blocks (~100 entries each) — so it can leave the stream
     // above 100 if the current entries don't line up on a block
     // boundary yet. That's fine here; the exact daily trim below
-    // (trimEventsExact, wired into the 2am cron job) is what actually
-    // guarantees it lands on precisely 100 long-term.
+    // (trimEventsExact, wired into the 2:50am IST cron job) is what
+    // actually guarantees it lands on precisely 100 long-term.
     discordQueue.trimEvents(100).catch((e) => console.error('Could not trim Discord events stream:', e.message));
 
     // Exact daily cleanup for the events stream. `maxLen: 100` above and
@@ -981,17 +989,37 @@ function createDiscordIntegration(supabaseAdmin) {
         else if (count) console.log(`Wiped ${count} transaction(s) older than 1 month.`);
     }
 
-    // Daily wipe + exact events-stream trim at 2am, weekly summary Monday
-    // 9am, monthly summary on the 1st at 9am — all server-local time.
+    // Daily wipe + exact events-stream trim at 2:50am IST, weekly summary
+    // Monday 9am IST, monthly summary on the 1st at 9am IST. Each job now
+    // passes `{ timezone: CRON_TZ }` explicitly, so the times below are
+    // fixed IST wall-clock times regardless of what timezone the host
+    // OS/container's clock is actually set to — previously these relied
+    // on implicit server-local time, which silently drifted whenever the
+    // server wasn't itself configured for Asia/Kolkata (e.g. a UTC-default
+    // host would have fired these 5.5h later than intended in IST terms).
     // Only runs while the Node process is up, like any cron job.
     function scheduleJobs() {
-        cron.schedule('0 2 * * *', () => {
-            wipeOldTransactions().catch((e) => console.error('wipeOldTransactions error:', e));
-            trimEventsExact().catch((e) => console.error('trimEventsExact error:', e));
-        });
-        cron.schedule('0 9 * * 1', () => sendWeeklySummary().catch((e) => console.error('sendWeeklySummary error:', e)));
-        cron.schedule('0 9 1 * *', () => sendMonthlySummary().catch((e) => console.error('sendMonthlySummary error:', e)));
-        console.log('Scheduled jobs: daily 1-month transaction wipe + events stream trim, weekly summary (Mon), monthly summary (1st).');
+        cron.schedule(
+            '50 2 * * *',
+            () => {
+                wipeOldTransactions().catch((e) => console.error('wipeOldTransactions error:', e));
+                trimEventsExact().catch((e) => console.error('trimEventsExact error:', e));
+            },
+            { timezone: CRON_TZ }
+        );
+        cron.schedule(
+            '0 9 * * 1',
+            () => sendWeeklySummary().catch((e) => console.error('sendWeeklySummary error:', e)),
+            { timezone: CRON_TZ }
+        );
+        cron.schedule(
+            '0 9 1 * *',
+            () => sendMonthlySummary().catch((e) => console.error('sendMonthlySummary error:', e)),
+            { timezone: CRON_TZ }
+        );
+        console.log(
+            `Scheduled jobs (${CRON_TZ}): daily 1-month transaction wipe + events stream trim at 2:50am, weekly summary (Mon 9am), monthly summary (1st 9am).`
+        );
     }
 
     return {
