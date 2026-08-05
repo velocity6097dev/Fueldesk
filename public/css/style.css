@@ -1,5 +1,9 @@
+/* "Receipt Mono" is a fixed alias, not tied to any one font file.
+   To swap the receipt's font, change ONLY the url() below —
+   --font-mono and every rule using it will pick it up automatically. */
+
 @font-face {
-    font-family: "CSAlice Mono";
+    font-family: "Receipt Mono";
     src: url("/fonts/CSAliceMono-Regular_demo-BF673d3a6435a92.woff2") format("woff2");
     font-weight: 400;
     font-style: normal;
@@ -7,7 +11,7 @@
 }
 
 /* @font-face {
-    font-family: "CSAlice Mono";
+    font-family: "Receipt Mono";
     src: url("/fonts/CSAliceMono-Regular_demo-BF673d3a6435a92.woff2") format("woff2");
     font-weight: 700;
     font-style: normal;
@@ -37,7 +41,7 @@
   --radius: 8px;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  --font-mono: 'Receipt Mono', 'SFMono-Regular', Consolas, monospace;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }

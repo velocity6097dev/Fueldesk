@@ -35,13 +35,29 @@
         return `0000000${last9}`; // 7 zeros + 9 random digits = 16 digits
     }
 
+    // FP ID / Nozzle No on THIS template are fixed per fuel type instead
+    // of randomized like the other templates: Petrol (MS) always prints
+    // as 1, Diesel (HSD) always prints as 2. Any other product (e.g.
+    // PREMIUM) falls back to the normal random behavior shared by every
+    // other template.
+    function fixedFpId(product) {
+        if (product === 'MS') return '1';
+        if (product === 'HSD') return '2';
+        return window.BillTemplates.randomFpId();
+    }
+    function fixedNozzleNo(product) {
+        if (product === 'MS') return '1';
+        if (product === 'HSD') return '2';
+        return window.BillTemplates.randomNozzleNo();
+    }
+
     window.BillTemplates.register({
         id: 'IOCL_GILBARCO',
         label: 'IOCL Gilbarco (Classic Receipt)',
 
         render(data) {
             const s = data.station;
-            const { formattedBlock, renderLogoBlock, escapeHtml, randomFpId, randomNozzleNo } = window.BillTemplates;
+            const { formattedBlock, renderLogoBlock, escapeHtml } = window.BillTemplates;
             const footer = data.footer || '<center>Thank You! Please Visit Again..</center>';
 
             // No text logo placeholder here -- if no photo is uploaded, this
@@ -73,8 +89,8 @@
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}
                 ${line('Date', dateStr4)}
                 ${line('Time', timeStrSec)}
-                ${line('FP. ID', randomFpId())}
-                ${line('Nozl No', randomNozzleNo())}
+                ${line('FP. ID', fixedFpId(data.product))}
+                ${line('Nozl No', fixedNozzleNo(data.product))}
                 ${line('Fuel', fuelName)}
                 ${line('Density', `${data.density}kg/m3`)}
                 ${line('Preset', preset)}
