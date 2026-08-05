@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FuelDesk — Format</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/assetPreloader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="loader-active">
@@ -28,6 +29,9 @@
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" class="topbar-icon-btn" id="sync-btn" aria-label="Sync">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                </button>
                 <button type="button" class="btn btn-ghost btn-xs logout-btn" style="color:#fff;border-color:rgba(255,255,255,0.35);">Log Out</button>
             </div>
         </div>
@@ -136,6 +140,33 @@
                     </div>
                     <div class="hint" style="margin-top:6px;">This is the single control for how big or small the whole receipt prints. Watch the preview above as you move it.</div>
                 </label>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Print Quality</div>
+                <div class="block-sub">Compensates for a printer running too dark/too light, or text that's coming out too thin/too heavy — not template-specific, applies to every bill.</div>
+
+                <label class="field">
+                    <span>Print Darkness</span>
+                    <div class="range-row">
+                        <input type="range" id="print-darkness" min="20" max="100" step="1" value="100">
+                        <span class="range-value" id="print-darkness-value">100%</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-soft);margin-top:2px;">
+                        <span>Light</span><span>Dark</span>
+                    </div>
+                </label>
+
+                <label class="field" style="margin-top:14px;">
+                    <span>Text Thickness</span>
+                    <div class="range-row">
+                        <input type="range" id="text-thickness" min="0" max="100" step="5" value="0">
+                        <span class="range-value" id="text-thickness-value">Normal</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-soft);margin-top:2px;">
+                        <span>Thin</span><span>Thick</span>
+                    </div>
+                </label>
 
                 <div class="settings-actions">
                     <button type="button" id="save-format-btn" class="btn btn-primary btn-block">Save</button>
@@ -151,6 +182,7 @@
     <script src="/js/authGuard.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/pageLoader.js"></script>
+    <script src="/js/sync.js"></script>
     <script src="/templates/registry.js"></script>
     <script src="/templates/bpclTokheim.js"></script>
     <script src="/templates/ioclTokheim.js"></script>

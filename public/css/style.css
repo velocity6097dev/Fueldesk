@@ -6,13 +6,13 @@
     font-display: swap;
 }
 
-@font-face {
+/* @font-face {
     font-family: "CSAlice Mono";
     src: url("/fonts/CSAliceMono-Regular_demo-BF673d3a6435a92.woff2") format("woff2");
     font-weight: 700;
     font-style: normal;
     font-display: swap;
-}
+} */
 
 :root {
   --navy: #0B3556;
@@ -906,6 +906,76 @@ body.loader-active {
 @keyframes page-loader-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ---------------- First-run asset preloader (fonts / images / sw.js) ----------------
+   Only ever appears when assetPreloader.js finds something missing from
+   the asset cache (first visit, or cache cleared) — otherwise it's never
+   inserted into the page at all. Sits above #page-loader (z-index 999)
+   so on a first visit the order is: assets download here first, then
+   this fades out to reveal the normal auth/data spinner underneath. */
+#asset-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+}
+#asset-preloader.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+body.asset-loader-active {
+  overflow: hidden;
+}
+.asset-preloader-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 260px;
+  padding: 0 24px;
+}
+.asset-preloader-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+.asset-preloader-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--amber), var(--amber-dark));
+  transition: width 0.15s ease;
+}
+.asset-preloader-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+.asset-preloader-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.asset-preloader-pct {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+  flex-shrink: 0;
+}
+
 /* ---------------- Copy protection (Billing entry screen only) ---------------- */
 /* Ordinary text (labels, buttons, headings, receipt preview, etc.) can't be
    selected/copied. Actual input fields stay fully selectable & copyable. */
@@ -937,4 +1007,5 @@ body.billing-page textarea {
   .topbar-text strong, .topbar-sub, .role-badge { animation: none; }
   .bottom-nav { animation: none; }
   .nav-btn.active::before { animation: none; transform: translateX(-50%) scale(1); }
+  .asset-preloader-fill { transition: none; }
 }

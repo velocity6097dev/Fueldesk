@@ -24,6 +24,10 @@ const lineSpacingSlider = document.getElementById('line-spacing');
 const lineSpacingValue = document.getElementById('line-spacing-value');
 const baseFontSlider = document.getElementById('base-font');
 const baseFontValue = document.getElementById('base-font-value');
+const printDarknessSlider = document.getElementById('print-darkness');
+const printDarknessValue = document.getElementById('print-darkness-value');
+const textThicknessSlider = document.getElementById('text-thickness');
+const textThicknessValue = document.getElementById('text-thickness-value');
 const saveFormatBtn = document.getElementById('save-format-btn');
 
 document.getElementById('back-btn').addEventListener('click', () => window.location.href = '/admin.html');
@@ -98,6 +102,8 @@ function renderPreview() {
         marginMm: Number(marginSideSlider.value),
         lineSpacing: Number(lineSpacingSlider.value),
         baseFontPx: Number(baseFontSlider.value),
+        printDarknessPct: Number(printDarknessSlider.value),
+        textThicknessPct: Number(textThicknessSlider.value),
     });
 }
 
@@ -113,6 +119,12 @@ wireLiveSlider(logoHeightSlider, logoHeightValue, (v) => `${v}mm`);
 wireLiveSlider(marginSideSlider, marginSideValue, (v) => `${v}mm`);
 wireLiveSlider(lineSpacingSlider, lineSpacingValue, (v) => Number(v).toFixed(2));
 wireLiveSlider(baseFontSlider, baseFontValue, (v) => `${v}px`);
+wireLiveSlider(printDarknessSlider, printDarknessValue, (v) => `${v}%`);
+wireLiveSlider(textThicknessSlider, textThicknessValue, (v) => {
+    const n = Number(v);
+    if (n === 0) return 'Normal';
+    return n >= 50 ? `Thick (${n}%)` : `+${n}%`;
+});
 
 logoPositionSlider.addEventListener('input', () => {
     const v = Number(logoPositionSlider.value);
@@ -157,6 +169,8 @@ saveFormatBtn.addEventListener('click', async () => {
             receipt_margin_mm: Number(marginSideSlider.value),
             receipt_line_spacing: Number(lineSpacingSlider.value),
             receipt_base_font_px: Number(baseFontSlider.value),
+            receipt_print_darkness_pct: Number(printDarknessSlider.value),
+            receipt_text_thickness_pct: Number(textThicknessSlider.value),
         });
         Toast.show('Format saved — every bill will use this from now on.');
     } catch (err) {
@@ -198,6 +212,13 @@ async function loadConfig() {
     lineSpacingValue.textContent = Number(lineSpacingSlider.value).toFixed(2);
     baseFontSlider.value = data.receipt_base_font_px ?? 11;
     baseFontValue.textContent = `${baseFontSlider.value}px`;
+
+    printDarknessSlider.value = data.receipt_print_darkness_pct ?? 100;
+    printDarknessValue.textContent = `${printDarknessSlider.value}%`;
+
+    textThicknessSlider.value = data.receipt_text_thickness_pct ?? 0;
+    const tv = Number(textThicknessSlider.value);
+    textThicknessValue.textContent = tv === 0 ? 'Normal' : (tv >= 50 ? `Thick (${tv}%)` : `+${tv}%`);
 
     templatePicker.set(data.active_template);
     renderPreview();

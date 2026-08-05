@@ -341,6 +341,8 @@ printBtn.addEventListener('click', async () => {
         marginMm: currentConfig.receipt_margin_mm,
         lineSpacing: currentConfig.receipt_line_spacing,
         baseFontPx: currentConfig.receipt_base_font_px,
+        printDarknessPct: currentConfig.receipt_print_darkness_pct,
+        textThicknessPct: currentConfig.receipt_text_thickness_pct,
     });
 
     applyReceiptWidth(currentConfig.receipt_width_cm);

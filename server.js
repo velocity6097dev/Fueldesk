@@ -2,6 +2,8 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { createDiscordIntegration } = require('./discord');
 
@@ -58,6 +60,74 @@ app.get('/env.js', (req, res) => {
             AUTH_EMAIL_DOMAIN,
         })};`
     );
+});
+
+// ---------------------------------------------------------------
+// Asset manifest for the first-run loader (assetPreloader.js) and the
+// service worker (sw.js). Rather than a hand-maintained list, this
+// reads whatever files actually exist in /fonts and /resources right
+// now — drop a new font or logo in either folder and it's picked up
+// automatically, no code change needed anywhere.
+//
+// `version` is a short hash of every asset's path + byte size. It
+// changes on its own whenever a file is added, removed, or replaced
+// with different content, which is what tells returning visitors'
+// browsers to drop the old cache bucket and fetch the new one — no
+// manual "bump the version" step to remember.
+// ---------------------------------------------------------------
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
+function listPublicDir(relDir, labelPrefix) {
+    const absDir = path.join(PUBLIC_DIR, relDir);
+    let entries;
+    try {
+        entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch (err) {
+        return []; // folder doesn't exist — nothing to list, not fatal
+    }
+    return entries
+        .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+        .map((entry) => {
+            const stat = fs.statSync(path.join(absDir, entry.name));
+            return { url: `/${relDir}/${entry.name}`, label: `${labelPrefix} — ${entry.name}`, bytes: stat.size };
+        });
+}
+
+// The app-shell files (css/js/offline page/service worker itself) are
+// few and stable enough to name explicitly, unlike fonts/resources
+// which are meant to grow without touching this file.
+const APP_SHELL_ASSETS = [
+    { url: '/css/style.css', label: 'Stylesheet' },
+    { url: '/js/ui.js', label: 'App core' },
+    { url: '/js/pageLoader.js', label: 'App core' },
+    { url: '/js/authGuard.js', label: 'App core' },
+    { url: '/js/supabaseClient.js', label: 'App core' },
+    { url: '/js/assetPreloader.js', label: 'App core' },
+    { url: '/error.html', label: 'Offline page' },
+    { url: '/error.js', label: 'Offline page script' },
+    { url: '/sw.js', label: 'Service worker' },
+].map((asset) => {
+    try {
+        return { ...asset, bytes: fs.statSync(path.join(PUBLIC_DIR, asset.url)).size };
+    } catch (err) {
+        return { ...asset, bytes: 20000 }; // file missing — keep a rough fallback weight rather than crash
+    }
+});
+
+function buildAssetManifest() {
+    const assets = [
+        ...APP_SHELL_ASSETS,
+        ...listPublicDir('fonts', 'Font'),
+        ...listPublicDir('resources', 'Image'),
+    ];
+    const fingerprint = assets.map((a) => `${a.url}:${a.bytes}`).sort().join('|');
+    const version = crypto.createHash('sha1').update(fingerprint).digest('hex').slice(0, 10);
+    return { version, assets };
+}
+
+app.get('/api/asset-manifest', (req, res) => {
+    res.set('Cache-Control', 'no-store'); // always the live directory listing, never a stale cached one
+    res.json(buildAssetManifest());
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -305,6 +375,7 @@ const SUPER_ADMIN_FIELDS = [
     'receipt_footer', 'logo_url', 'logo_width_mm',
     'logo_position_pct', 'logo_ratio_locked', 'logo_height_mm',
     'receipt_width_cm', 'receipt_margin_mm', 'receipt_line_spacing', 'receipt_base_font_px',
+    'receipt_print_darkness_pct', 'receipt_text_thickness_pct',
     'active_template', 'subscription_plan', 'subscription_expiry_date',
 ];
 

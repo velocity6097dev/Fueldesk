@@ -162,17 +162,41 @@ window.BillTemplates = (function () {
     }
 
     // Applies GLOBAL formatting (side margin, line height, base font
-    // size) around a template's rendered HTML. This is independent of
-    // any one template — used by billing.js / admin.js / format.js right
-    // before injecting into the receipt container, so it applies the
-    // same way no matter which template is active. Values come from
-    // daily_config (receipt_margin_mm, receipt_line_spacing,
-    // receipt_base_font_px), editable live with a preview on Format.
+    // size, print darkness, text thickness) around a template's
+    // rendered HTML. This is independent of any one template — used by
+    // billing.js / admin.js / format.js right before injecting into the
+    // receipt container, so it applies the same way no matter which
+    // template is active. Values come from daily_config
+    // (receipt_margin_mm, receipt_line_spacing, receipt_base_font_px,
+    // receipt_print_darkness_pct, receipt_text_thickness_pct), editable
+    // live with a preview on Format.
+    //
+    // printDarknessPct (20-100, default 100): how dark the printed text
+    // is. 100 = solid black (unchanged default look). Lower values fade
+    // the text toward light gray — useful when a thermal printer is
+    // burning bills darker than needed, or to save ribbon/paper wear.
+    // Implemented as a plain grayscale `color`, inherited by every child
+    // element that doesn't set its own color.
+    //
+    // textThicknessPct (0-100, default 0): how thick/bold the printed
+    // strokes look. 0 = normal weight (unchanged default look). Higher
+    // values add a hairline `-webkit-text-stroke` on top of the glyph
+    // fill (fine-grained, unlike the all-or-nothing jump of font-weight
+    // alone) and switch to bold past the midpoint, so thin custom
+    // receipt fonts with only one embedded weight still visibly thicken.
     function wrapForOutput(innerHtml, opts = {}) {
         const marginMm = opts.marginMm ?? 3;
         const lineSpacing = opts.lineSpacing ?? 1.2;
         const baseFontPx = opts.baseFontPx ?? 11;
-        return `<div style="display:flow-root;box-sizing:border-box;width:100%;padding:0 ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;">${innerHtml}</div>`;
+        const darknessPct = Math.max(20, Math.min(100, opts.printDarknessPct ?? 100));
+        const thicknessPct = Math.max(0, Math.min(100, opts.textThicknessPct ?? 0));
+
+        const gray = Math.round(255 * (1 - darknessPct / 100));
+        const textColor = `rgb(${gray},${gray},${gray})`;
+        const strokeWidth = ((thicknessPct / 100) * 0.45).toFixed(2);
+        const fontWeight = thicknessPct >= 50 ? 700 : 400;
+
+        return `<div style="display:flow-root;box-sizing:border-box;width:100%;padding:0 ${marginMm}mm;line-height:${lineSpacing};font-size:${baseFontPx}px;color:${textColor};font-weight:${fontWeight};-webkit-text-stroke:${strokeWidth}px ${textColor};">${innerHtml}</div>`;
     }
 
     return { register, get, list, escapeHtml, formattedBlock, renderLogoBlock, wrapForOutput, randomFpId, randomNozzleNo, COMMANDS_HELP_HTML };

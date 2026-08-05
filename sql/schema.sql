@@ -119,6 +119,14 @@ create table if not exists daily_config (
     receipt_line_spacing  numeric(3,2) not null default 1.20 check (receipt_line_spacing between 1.0 and 2.0),
     receipt_base_font_px  numeric(4,1) not null default 11.0 check (receipt_base_font_px between 8 and 16),
 
+    -- Print "ink" controls — how dark/light and how thin/thick the printed
+    -- text looks. 100 = full black (default, unchanged look); lower values
+    -- print progressively lighter gray. 0 = normal weight (default,
+    -- unchanged look); higher values thicken/bolden the glyphs. Applied
+    -- the same way as the fields above (BillTemplates.wrapForOutput).
+    receipt_print_darkness_pct  numeric(5,1) not null default 100.0 check (receipt_print_darkness_pct between 20 and 100),
+    receipt_text_thickness_pct  numeric(5,1) not null default 0.0 check (receipt_text_thickness_pct between 0 and 100),
+
     ms_rate           numeric(10,2) not null default 108.97,
     ms_density        numeric(6,1)  not null default 755.0,
     hsd_rate          numeric(10,2) not null default 92.00,
