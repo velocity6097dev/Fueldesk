@@ -37,7 +37,7 @@
   --radius: 8px;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  /* --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace; */
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
