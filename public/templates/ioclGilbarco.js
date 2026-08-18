@@ -15,7 +15,15 @@
         fieldBlock: 1.0,
         labelColWidth: 4.9,  // em -- reserved width for the label column before the colon
         footer: 1.0,
+        cashMemo: 1.0, // font size of the fixed "CASH MEMO" line printed above the station name
     };
+
+    // Vertical gap between the logo and the "CASH MEMO" line right below
+    // it, in mm. This is this template's own spacing knob, separate from
+    // the global margin/line-height controls in the Format panel (those
+    // apply uniformly around the whole receipt, not between these two
+    // specific pieces).
+    const LOGO_TO_TEXT_GAP_MM = 3;
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };
 
@@ -80,6 +88,7 @@
 
             return `
                 ${logoBlock}
+                <div style="font-size:${TEXT_SCALE.cashMemo}em;margin-top:${LOGO_TO_TEXT_GAP_MM}mm;">CASH MEMO</div>
                 ${formattedBlock(s.name, `font-size:${TEXT_SCALE.stationName}em;`)}
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}

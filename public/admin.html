@@ -37,68 +37,81 @@
 
         <div class="app-main">
 
-            <!-- Everything in this section is Super Admin only — Admin Staff never sees it. -->
-            <div id="super-admin-section" class="hidden">
+            <!-- Station Details + Receipt Branding: visible to Admin Staff AND
+                 Super Admin. Inside them, anything marked "super-admin-only-field"
+                 (logo upload/remove, template picker, preview, format panel) is
+                 hidden for Admin Staff by admin.js — Admin Staff gets Name,
+                 Address, Phone, and the Receipt Footer text, but not those. -->
+            <div class="settings-block">
+                <div class="block-title">Station Details</div>
+                <label class="field">
+                    <span class="field-label-row">
+                        Station Name
+                        <button type="button" class="info-btn" id="name-info-btn">i</button>
+                    </span>
+                    <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
+                </label>
 
-                <div class="settings-block">
-                    <div class="block-title">Station Details</div>
-                    <label class="field">
-                        <span class="field-label-row">
-                            Station Name
-                            <button type="button" class="info-btn" id="name-info-btn">i</button>
-                        </span>
-                        <input type="text" id="station-name" placeholder="e.g. Bahar Service Station">
-                    </label>
-                    <label class="field" style="margin-top:14px;">
-                        <span class="field-label-row">
-                            Address
-                            <button type="button" class="info-btn" id="address-info-btn">i</button>
-                        </span>
-                        <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;<center>State - PIN</center>"></textarea>
-                    </label>
-                    <div class="hint" style="margin-top:6px;">Left-aligned by default. Tap the <b>i</b> above for centering / bold commands.</div>
-                    <label class="field" style="margin-top:14px;">
-                        <span>Phone</span>
-                        <input type="text" id="station-phone" placeholder="98XXXXXXXX">
-                    </label>
+                <label class="field" style="margin-top:14px;">
+                    <span class="field-label-row">
+                        Address
+                        <button type="button" class="info-btn" id="address-info-btn">i</button>
+                    </span>
+                    <textarea id="station-address" rows="3" placeholder="Street&#10;City / District&#10;<center>State - PIN</center>"></textarea>
+                </label>
+                <div class="hint" style="margin-top:6px;">Left-aligned by default. Tap the <b>i</b> above for centering / bold commands.</div>
+                <label class="field" style="margin-top:14px;">
+                    <span>Phone</span>
+                    <input type="text" id="station-phone" placeholder="98XXXXXXXX">
+                </label>
+            </div>
+
+            <div class="settings-block">
+                <div class="block-title">Receipt Branding</div>
+
+                <div class="field">
+                    <span>Logo</span>
+                    <div class="photo-upload-row">
+                        <div class="photo-preview" id="logo-preview">No logo</div>
+                        <div class="photo-upload-actions super-admin-only-field">
+                            <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Upload Photo</button>
+                            <button type="button" class="btn-danger-text btn btn-sm" id="logo-remove-btn" style="display:none;">Remove Logo</button>
+                            <input type="file" id="logo-file-input" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="hint super-admin-only-field" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
                 </div>
 
-                <div class="settings-block">
-                    <div class="block-title">Receipt Branding</div>
+                <label class="field" style="margin-top:14px;">
+                    <span class="field-label-row">
+                        Receipt Footer
+                        <button type="button" class="info-btn" id="footer-info-btn">i</button>
+                    </span>
+                    <textarea id="receipt-footer" rows="2" placeholder="<center>Thank You! Please Visit Again..</center>"></textarea>
+                </label>
 
-                    <div class="field">
-                        <span>Logo</span>
-                        <div class="photo-upload-row">
-                            <div class="photo-preview" id="logo-preview">No logo</div>
-                            <div class="photo-upload-actions">
-                                <button type="button" class="btn btn-ghost btn-sm" id="logo-upload-btn">Upload Photo</button>
-                                <button type="button" class="btn-danger-text btn btn-sm" id="logo-remove-btn" style="display:none;">Remove Logo</button>
-                                <input type="file" id="logo-file-input" accept="image/*">
-                            </div>
-                        </div>
-                        <div class="hint" style="margin-top:10px;">If no logo is uploaded, the template's default text logo is used instead.</div>
-                    </div>
+                <div class="field super-admin-only-field" style="margin-top:14px;">
+                    <span>Receipt Template</span>
+                    <button type="button" class="picker-btn" id="template-picker-btn">
+                        <span id="template-picker-label"></span>
+                        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <!-- Admin Staff sees the active template named, but can't change it. -->
+                <div class="field admin-staff-only-field hidden" style="margin-top:14px;">
+                    <span>Receipt Template</span>
+                    <div class="picker-btn" style="opacity:0.65;" id="template-readonly-label"></div>
+                </div>
 
-                    <label class="field" style="margin-top:14px;">
-                        <span class="field-label-row">
-                            Receipt Footer
-                            <button type="button" class="info-btn" id="footer-info-btn">i</button>
-                        </span>
-                        <textarea id="receipt-footer" rows="2" placeholder="<center>Thank You! Please Visit Again..</center>"></textarea>
-                    </label>
-
-                    <div class="field" style="margin-top:14px;">
-                        <span>Receipt Template</span>
-                        <button type="button" class="picker-btn" id="template-picker-btn">
-                            <span id="template-picker-label"></span>
-                            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                        </button>
-                    </div>
-
+                <div class="super-admin-only-field">
                     <button type="button" class="btn btn-ghost btn-block" id="preview-receipt-btn" style="margin-top:14px;">Preview Receipt</button>
                     <div class="hint" style="margin-top:8px;">FP ID and nozzle number are generated automatically and vary on every bill — no setup needed.</div>
-                    <button type="button" class="btn btn-primary btn-block" id="format-panel-btn" style="margin-top:14px;">Open Format Panel — Sizing, Position &amp; Spacing</button>
                 </div>
+                <button type="button" class="btn btn-primary btn-block super-admin-only-field" id="format-panel-btn" style="margin-top:14px;">Open Format Panel — Sizing, Position &amp; Spacing</button>
+            </div>
+
+            <!-- Everything in this section is Super Admin only — Admin Staff never sees it. -->
+            <div id="super-admin-section" class="hidden">
 
                 <div class="settings-block">
                     <div class="block-title">Integrations</div>

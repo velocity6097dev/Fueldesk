@@ -19,6 +19,7 @@ const logoUploadBtn = document.getElementById('logo-upload-btn');
 const logoRemoveBtn = document.getElementById('logo-remove-btn');
 const logoFileInput = document.getElementById('logo-file-input');
 const previewReceiptBtn = document.getElementById('preview-receipt-btn');
+const templateReadonlyLabel = document.getElementById('template-readonly-label');
 
 const subscriptionExpiryInput = document.getElementById('subscription-expiry');
 const saveSubscriptionBtn = document.getElementById('save-subscription-btn');
@@ -283,6 +284,15 @@ previewReceiptBtn.addEventListener('click', async () => {
 
     if (profile.role === 'SUPER_ADMIN') {
         superAdminSection.classList.remove('hidden');
+    } else {
+        // Admin Staff: gets Station Name + Receipt Branding, but not the
+        // logo upload/remove, template picker, preview, or format panel —
+        // hide those specific controls and swap in a read-only template
+        // label instead. This is a UX courtesy only; /api/config on the
+        // server enforces the actual permission regardless of what's
+        // shown here.
+        document.querySelectorAll('.super-admin-only-field').forEach((el) => el.classList.add('hidden'));
+        document.querySelectorAll('.admin-staff-only-field').forEach((el) => el.classList.remove('hidden'));
     }
 
     // The template picker was created with an empty option list (templates
@@ -292,5 +302,10 @@ previewReceiptBtn.addEventListener('click', async () => {
 
     FuelDeskAuth.renderPanelSwitcher('admin');
     await loadConfig(configPromise);
+
+    if (profile.role !== 'SUPER_ADMIN') {
+        templateReadonlyLabel.textContent = window.BillTemplates.get(currentConfig?.active_template).label;
+    }
+
     window.PageLoader?.ready();
 })();

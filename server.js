@@ -364,15 +364,21 @@ app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
 
 // ---------------------------------------------------------------
 // Rates / density / template / station details / subscription.
-// Admin Staff can only touch rate & density fields; everything else
-// (branding, format, template, subscription reminder) is Super Admin
-// only. Fields outside a caller's allowed set are silently ignored
-// rather than erroring, matching how partial saves already work.
+// Admin Staff can touch rate & density fields, plus a "name +
+// receipt branding" slice (station_name, station_address,
+// station_phone, receipt_footer) -- but NOT the logo, the active
+// template, or any of the format/subscription fields, which stay
+// Super Admin only. Fields outside a caller's allowed set are
+// silently ignored rather than erroring, matching how partial saves
+// already work. This list is the source of truth for the permission
+// -- the admin.html UI hiding those controls for Admin Staff is just
+// a courtesy; it's this server-side allow-list that actually
+// enforces it.
 // ---------------------------------------------------------------
 const RATE_FIELDS = ['ms_rate', 'ms_density', 'hsd_rate', 'hsd_density', 'premium_rate', 'premium_density'];
-const SUPER_ADMIN_FIELDS = [
-    'station_name', 'station_address', 'station_phone',
-    'receipt_footer', 'logo_url', 'logo_width_mm',
+const ADMIN_STAFF_BRANDING_FIELDS = ['station_name', 'station_address', 'station_phone', 'receipt_footer'];
+const SUPER_ADMIN_ONLY_FIELDS = [
+    'logo_url', 'logo_width_mm',
     'logo_position_pct', 'logo_ratio_locked', 'logo_height_mm',
     'receipt_width_cm', 'receipt_margin_mm', 'receipt_line_spacing', 'receipt_base_font_px',
     'receipt_print_darkness_pct', 'receipt_text_thickness_pct',
@@ -381,8 +387,8 @@ const SUPER_ADMIN_FIELDS = [
 
 app.put('/api/config', requireAdmin, async (req, res) => {
     const allowedFields = req.profile.role === 'SUPER_ADMIN'
-        ? [...RATE_FIELDS, ...SUPER_ADMIN_FIELDS]
-        : RATE_FIELDS;
+        ? [...RATE_FIELDS, ...ADMIN_STAFF_BRANDING_FIELDS, ...SUPER_ADMIN_ONLY_FIELDS]
+        : [...RATE_FIELDS, ...ADMIN_STAFF_BRANDING_FIELDS];
 
     const updates = {};
     for (const field of allowedFields) {
