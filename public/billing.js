@@ -197,6 +197,7 @@ async function loadConfig(inFlightPromise) {
     setPrintButtonLoading(false);
 
     renderSubscriptionBanner(data.subscription_expiry_date);
+    renderSubscriptionBlock(data.subscription_expiry_date, data.station_name);
 }
 
 // Live sync: if an admin changes rates/density (or anything else in
@@ -209,6 +210,10 @@ function subscribeToConfigChanges() {
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
             currentConfig = payload.new;
             updateLiveStats();
+            // Keep the block/banner in sync live too — e.g. a Super Admin
+            // renews from Settings on another device while this page is
+            // open, and it should unlock immediately without a reload.
+            renderSubscriptionBlock(payload.new.subscription_expiry_date, payload.new.station_name);
             Toast.show('Rates were just updated by an admin.');
         })
         .subscribe();

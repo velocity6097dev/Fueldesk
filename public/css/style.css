@@ -726,6 +726,20 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   padding: 9px 14px; position: relative; z-index: 30;
 }
 
+/* ---------------- Subscription/hosting expired — full-screen blockade ----------------
+   Reuses .offline-overlay / .offline-card (see above) so it looks and
+   behaves exactly like every other full-screen state in the app —
+   these rules only add the bits unique to this one. */
+.subscription-block-whatsapp-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #25D366; box-shadow: 0 4px 12px rgba(37,211,102,0.32);
+  text-decoration: none; margin-top: 4px;
+}
+.subscription-block-whatsapp-btn:hover { background: #1EBE5A; box-shadow: 0 6px 16px rgba(37,211,102,0.38); }
+.subscription-block-whatsapp-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.subscription-block-number { color: var(--ink-soft); font-weight: 600; margin-top: 8px; margin-bottom: 0; }
+.subscription-block-brand { margin: 18px auto 0; }
+
 /* ---------------- App branding footer (web pages only, never the printed receipt) ---------------- */
 .app-footer-brand {
   display: flex; align-items: center; justify-content: center; gap: 6px;
