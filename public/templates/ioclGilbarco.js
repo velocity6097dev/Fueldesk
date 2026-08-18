@@ -26,21 +26,21 @@
     const LOGO_TO_TEXT_GAP_MM = 3;
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };
+    const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     function pad2(n) { return String(n).padStart(2, '0'); }
 
-    // Cosmetic, print-only numbers meant to match a real pump printer's
-    // jitter between bills -- these are NOT your real database IDs. Your
+    // Cosmetic, print-only number meant to match a real pump printer's
+    // jitter between bills -- this is NOT your real database ID. Your
     // actual unique receipt number / row id are still tracked normally
     // everywhere else in the app (transactions table, staff attribution,
     // etc.) -- only what's printed on THIS template's paper is randomized.
-    function randomBillNo() {
-        const digits = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
-        return `${digits}-ORGNL`;
-    }
-    function randomTransactionId() {
-        const last9 = String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
-        return `0000000${last9}`; // 7 zeros + 9 random digits = 16 digits
+    // Format: <Month abbreviation of the bill date>-<random 4 digits>-ORGNL,
+    // e.g. "Aug-3354-ORGNL".
+    function randomBillNo(dt) {
+        const month = MONTH_ABBR[dt.getMonth()];
+        const digits = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+        return `${month}-${digits}-ORGNL`;
     }
 
     // FP ID / Nozzle No on THIS template are fixed per fuel type instead
@@ -92,10 +92,12 @@
                 ${formattedBlock(s.name, `font-size:${TEXT_SCALE.stationName}em;`)}
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}
-                ${line('Bill No', randomBillNo())}
-                ${line('Trns.ID', randomTransactionId())}
+                ${line('Bill No', randomBillNo(dt))}
+                ${line('Trns.ID', '')}
                 ${line('Atnd.ID', '')}
+                ${line('Receipt', 'No Receipt')}
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}
+                ${data.mobileNo ? line('Mob.No', `+91${data.mobileNo}`) : ''}
                 ${line('Date', dateStr4)}
                 ${line('Time', timeStrSec)}
                 ${line('FP. ID', fixedFpId(data.product))}
@@ -106,7 +108,6 @@
                 ${line('Rate', `Rs.${data.rate}`)}
                 ${line('Sale', `Rs.${data.amount}`)}
                 ${line('Volume', `${data.volume}L`)}
-                ${data.mobileNo ? line('Mobile', data.mobileNo) : ''}
                 <div style="font-size:${TEXT_SCALE.footer}em;">${formattedBlock(footer)}</div>
             `;
         },
