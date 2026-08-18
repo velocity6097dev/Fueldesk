@@ -23,7 +23,7 @@
     // the global margin/line-height controls in the Format panel (those
     // apply uniformly around the whole receipt, not between these two
     // specific pieces).
-    const LOGO_TO_TEXT_GAP_MM = 2;
+    const LOGO_TO_TEXT_GAP_MM = 3;
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };
     const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
