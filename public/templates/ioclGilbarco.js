@@ -23,7 +23,7 @@
     // the global margin/line-height controls in the Format panel (those
     // apply uniformly around the whole receipt, not between these two
     // specific pieces).
-    const LOGO_TO_TEXT_GAP_MM = 3;
+    const LOGO_TO_TEXT_GAP_MM = 2;
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };
     const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -93,7 +93,7 @@
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}
                 ${line('Bill No', randomBillNo(dt))}
-                ${line('Trns.ID', '')}
+                ${line('Trns.ID', data.transactionId)}
                 ${line('Atnd.ID', '')}
                 ${line('Receipt', 'No Receipt')}
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}

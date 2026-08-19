@@ -163,6 +163,17 @@ function updateAmountPreview() {
 
 function pad(n) { return String(n).padStart(2, '0'); }
 
+// Cosmetic 16-digit reference number printed on the receipt as the
+// "Transaction ID" — randomly generated per print, same as it used to
+// be. Format: 7 fixed zeros + 9 random digits (matches the format
+// ioclTokheim.js already generates locally for itself). It's purely
+// for show; the actual reconciliation key is receipt_no (sequential,
+// tied to the row in `transactions`), which is unaffected by this.
+function generateRandomTransactionId() {
+    const last9 = String(Math.floor(Math.random() * 1000000000)).padStart(9, '0');
+    return `0000000${last9}`;
+}
+
 function formatDateTime(d) {
     return {
         dateStr: `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`,
@@ -323,7 +334,7 @@ printBtn.addEventListener('click', async () => {
         },
         footer: currentConfig.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: inserted.receipt_no,
-        transactionId: String(inserted.id).padStart(16, '0'),
+        transactionId: generateRandomTransactionId(),
         billDateTimeIso: billDateTime.toISOString(),
         product,
         productLabel: PRODUCT_LABELS[product] || product,
