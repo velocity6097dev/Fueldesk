@@ -97,7 +97,7 @@
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}
                 ${line('Bill No', randomBillNo(dt))}
-                ${line('Trns.ID', '')}
+                ${line('Trns.ID', data.transactionId || '')}
                 ${line('Atnd.ID', '')}
                 ${line('Receipt', 'No Receipt')}
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}
