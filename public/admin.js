@@ -54,36 +54,12 @@ const planPicker = makePickerField({
 });
 
 const PLAN_MONTHS = { '1M': 1, '6M': 6, '12M': 12 };
-
-// Smart renewal: if the current expiry date is still in the future,
-// the new plan length is added on top of it, so any days already paid
-// for but not yet used aren't lost. If it's empty or already in the
-// past, the new plan just starts counting from today instead.
 renewedTodayBtn.addEventListener('click', () => {
     const months = PLAN_MONTHS[planPicker.get()] || 1;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let base = today;
-    if (subscriptionExpiryInput.value) {
-        const currentExpiry = new Date(`${subscriptionExpiryInput.value}T00:00:00`);
-        if (!isNaN(currentExpiry.getTime()) && currentExpiry > today) {
-            base = currentExpiry;
-        }
-    }
-    const carriedOverDays = Math.round((base - today) / (24 * 60 * 60 * 1000));
-
-    const expiry = new Date(base);
+    const expiry = new Date();
     expiry.setMonth(expiry.getMonth() + months);
     subscriptionExpiryInput.value = expiry.toISOString().slice(0, 10);
-
-    const monthsLabel = `${months} month${months === 1 ? '' : 's'}`;
-    Toast.show(
-        carriedOverDays > 0
-            ? `Expiry set to ${monthsLabel} from today + ${carriedOverDays} remaining day${carriedOverDays === 1 ? '' : 's'} — remember to Save.`
-            : `Expiry set to ${monthsLabel} from today — remember to Save.`
-    );
+    Toast.show(`Expiry set to ${months} month${months === 1 ? '' : 's'} from today — remember to Save.`);
 });
 
 wireCommandsInfoButton(document.getElementById('name-info-btn'), 'Station Name');
@@ -183,12 +159,6 @@ async function loadConfig(inFlightPromise) {
         return;
     }
     currentConfig = data;
-
-    // Admin Staff can't renew the subscription themselves (only Super
-    // Admin can save these fields — see SUPER_ADMIN_ONLY_FIELDS in
-    // server.js), so they're blocked here too, same as every other
-    // page. Super Admin is exempted automatically inside this call.
-    renderSubscriptionBlock(data.subscription_expiry_date, data.station_name);
 
     stationNameInput.value = data.station_name || '';
     stationAddressInput.value = data.station_address || '';

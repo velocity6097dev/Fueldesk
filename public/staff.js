@@ -165,12 +165,6 @@ addStaffBtn.addEventListener('click', async () => {
     const profile = await FuelDeskAuth.requireSession(['SUPER_ADMIN', 'ADMIN_STAFF']);
     if (!profile) return;
 
-    // Major fix: Staff management was previously left completely
-    // unblocked when the subscription expired. Admin Staff can reach
-    // this page and now gets blocked here like everywhere else; Super
-    // Admin is exempted automatically inside checkSubscriptionBlock.
-    await checkSubscriptionBlock();
-
     whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
 
     const roleOptions = ROLE_OPTIONS_BY_RANK[profile.role] || ROLE_OPTIONS_BY_RANK.ADMIN_STAFF;

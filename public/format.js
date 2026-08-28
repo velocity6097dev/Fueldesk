@@ -189,12 +189,6 @@ async function loadConfig() {
     }
     stationConfig = data;
 
-    // Format is Super-Admin-only already (see requireSession below), and
-    // Super Admin is exempted from this block automatically — so this
-    // only ever fires in the (currently impossible) case that changes.
-    // Kept for consistency/future-proofing with every other page.
-    renderSubscriptionBlock(data.subscription_expiry_date, data.station_name);
-
     logoPositionSlider.value = data.logo_position_pct ?? 50;
     const v = Number(logoPositionSlider.value);
     logoPositionValue.textContent = v === 0 ? 'Left' : v === 100 ? 'Right' : v === 50 ? 'Center' : `${v}%`;

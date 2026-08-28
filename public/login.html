@@ -10,10 +10,18 @@
 </head>
 <body>
 
-    <div class="auth-screen">
-        <div class="auth-card">
+    <div class="auth-screen login-screen">
+        <div class="auth-card login-card">
             <div class="brand">
-                <div class="brand-mark" style="border-radius:10px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--font-display);font-weight:700;">FD</div>
+                <div class="brand-mark">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 21V8a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v13"/>
+                        <path d="M4 21h10"/>
+                        <path d="M14 10h2l3 3v5a1.5 1.5 0 0 1-3 0"/>
+                        <path d="M7 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
+                        <line x1="7" y1="12" x2="11" y2="12"/>
+                    </svg>
+                </div>
                 <div>
                     <h1>FuelDesk</h1>
                     <p class="brand-sub">Log in with the account your admin gave you</p>
@@ -23,16 +31,22 @@
             <form id="authForm">
                 <label class="field">
                     <span>Username</span>
-                    <input type="text" id="username" autocomplete="username" placeholder="e.g. staff_rahul" autocapitalize="off" required>
+                    <div class="login-input-wrap">
+                        <input type="text" id="username" autocomplete="username" placeholder="e.g. staff_rahul" autocapitalize="off" required>
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+                    </div>
                 </label>
 
                 <label class="field">
                     <span>Password / PIN</span>
-                    <div class="pw-wrap">
-                        <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required>
-                        <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
+                    <div class="login-input-wrap">
+                        <div class="pw-wrap">
+                            <input type="password" id="password" autocomplete="current-password" placeholder="••••••••" required>
+                            <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                            </button>
+                        </div>
+                        <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
                     </div>
                 </label>
 
@@ -48,7 +62,7 @@
             <p class="auth-note text-center">
                 First time setting this up? Run <code>npm run create-admin</code> to create the first admin login.
             </p>
-            <div class="app-footer-brand"><span class="bolt">&#9889;</span> Made by Velocity.logs</div>
+            <div class="app-footer-brand"><span class="bolt">♥</span> Made by Velocity.logs</div>
         </div>
     </div>
 

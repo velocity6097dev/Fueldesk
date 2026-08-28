@@ -7,6 +7,7 @@ const PRODUCT_OPTIONS = [
 const MODE_OPTIONS = [
     { value: 'VOLUME', label: 'By Volume (Liters)' },
     { value: 'AMOUNT', label: 'By Amount (₹)' },
+    { value: 'VOLUME_PRESET', label: 'Volume Preset' },
 ];
 const TIME_MODE_OPTIONS = [
     { value: 'CURRENT', label: 'Current Time' },
@@ -18,6 +19,7 @@ const inputValueLabel = document.getElementById('input-value-label');
 const amountPreviewBox = document.getElementById('amount-preview-box');
 const amountPreviewMain = document.getElementById('amount-preview-main');
 const amountPreviewWords = document.getElementById('amount-preview-words');
+const volumePresetHint = document.getElementById('volume-preset-hint');
 const vehicleNoInput = document.getElementById('vehicle-no');
 const mobileNoInput = document.getElementById('mobile-no');
 const customTimeInputs = document.getElementById('custom-time-inputs');
@@ -51,6 +53,7 @@ const modePicker = makePickerField({
 document.getElementById('mode-picker-btn').addEventListener('picker-change', () => {
     updateInputLabel();
     updateAmountPreview();
+    volumePresetHint.style.display = modePicker.get() === 'VOLUME_PRESET' ? 'block' : 'none';
 });
 inputValue.addEventListener('input', updateAmountPreview);
 
@@ -85,7 +88,7 @@ function updateLiveStats() {
 }
 
 function updateInputLabel() {
-    inputValueLabel.textContent = modePicker.get() === 'VOLUME' ? 'Enter Volume (Liters)' : 'Enter Amount (₹)';
+    inputValueLabel.textContent = modePicker.get() === 'AMOUNT' ? 'Enter Amount (₹)' : 'Enter Volume (Liters)';
 }
 
 // ---- Live yellow preview under the amount/volume field ----
@@ -151,28 +154,17 @@ function updateAmountPreview() {
         return;
     }
 
-    if (modePicker.get() === 'VOLUME') {
-        amountPreviewMain.textContent = `${formatIndianCommas(val)} ltr`;
-        amountPreviewWords.textContent = '';
-    } else {
+    if (modePicker.get() === 'AMOUNT') {
         amountPreviewMain.textContent = `₹${formatIndianCommas(val)}`;
         amountPreviewWords.textContent = amountToWords(val);
+    } else {
+        amountPreviewMain.textContent = `${formatIndianCommas(val)} ltr`;
+        amountPreviewWords.textContent = '';
     }
     amountPreviewBox.classList.add('visible');
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
-
-// Cosmetic 16-digit reference number printed on the receipt as the
-// "Transaction ID" — randomly generated per print, same as it used to
-// be. Format: 7 fixed zeros + 9 random digits (matches the format
-// ioclTokheim.js already generates locally for itself). It's purely
-// for show; the actual reconciliation key is receipt_no (sequential,
-// tied to the row in `transactions`), which is unaffected by this.
-function generateRandomTransactionId() {
-    const last9 = String(Math.floor(Math.random() * 1000000000)).padStart(9, '0');
-    return `0000000${last9}`;
-}
 
 function formatDateTime(d) {
     return {
@@ -208,7 +200,6 @@ async function loadConfig(inFlightPromise) {
     setPrintButtonLoading(false);
 
     renderSubscriptionBanner(data.subscription_expiry_date);
-    renderSubscriptionBlock(data.subscription_expiry_date, data.station_name);
 }
 
 // Live sync: if an admin changes rates/density (or anything else in
@@ -221,10 +212,6 @@ function subscribeToConfigChanges() {
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
             currentConfig = payload.new;
             updateLiveStats();
-            // Keep the block/banner in sync live too — e.g. a Super Admin
-            // renews from Settings on another device while this page is
-            // open, and it should unlock immediately without a reload.
-            renderSubscriptionBlock(payload.new.subscription_expiry_date, payload.new.station_name);
             Toast.show('Rates were just updated by an admin.');
         })
         .subscribe();
@@ -276,7 +263,11 @@ printBtn.addEventListener('click', async () => {
         }
     }
 
-    const volume = mode === 'VOLUME' ? inputVal : +(inputVal / rate).toFixed(2);
+    // "Volume Preset" behaves exactly like "By Volume" for the actual math
+    // and what's stored — the only difference is purely cosmetic on the
+    // printed receipt (see presetOverride below). Only "By Amount" computes
+    // volume from the input; both volume-based modes take it as-is.
+    const volume = mode === 'AMOUNT' ? +(inputVal / rate).toFixed(2) : inputVal;
     const amount = mode === 'AMOUNT' ? inputVal : +(inputVal * rate).toFixed(2);
 
     const { dateStr, timeStr } = formatDateTime(billDateTime);
@@ -292,7 +283,11 @@ printBtn.addEventListener('click', async () => {
             density,
             volume,
             amount,
-            preset_type: mode,
+            // The database only accepts 'VOLUME' or 'AMOUNT' (see
+            // sql/schema.sql) — "Volume Preset" is a volume-mode bill as
+            // far as the database and every report/total are concerned;
+            // it only changes the printed Preset line, not what's saved.
+            preset_type: mode === 'VOLUME_PRESET' ? 'VOLUME' : mode,
             bill_datetime: billDateTime.toISOString(),
             bill_date: dateStr,
             bill_time: timeStr,
@@ -334,12 +329,12 @@ printBtn.addEventListener('click', async () => {
         },
         footer: currentConfig.receipt_footer || '<center>Thank You! Please Visit Again..</center>',
         receiptNo: inserted.receipt_no,
-        transactionId: generateRandomTransactionId(),
+        transactionId: String(inserted.id).padStart(16, '0'),
         billDateTimeIso: billDateTime.toISOString(),
         product,
         productLabel: PRODUCT_LABELS[product] || product,
         density: density,
-        presetTypeLabel: mode === 'VOLUME' ? 'Volume' : 'Amount',
+        presetTypeLabel: mode === 'AMOUNT' ? 'Amount' : 'Volume',
         rate: rate.toFixed(2),
         volume: volume.toFixed(2),
         amount: amount.toFixed(2),
@@ -350,6 +345,7 @@ printBtn.addEventListener('click', async () => {
         attendantUsername: FuelDeskAuth.displayName(window.currentProfile),
         vehicleNo: vehicleNoInput.value.trim().toUpperCase(),
         mobileNo,
+        presetOverride: mode === 'VOLUME_PRESET' ? '999L' : null,
     });
 
     const receiptEl = document.getElementById('thermal-receipt');

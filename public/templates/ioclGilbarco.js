@@ -80,7 +80,11 @@
             `;
 
             const fuelName = FUEL_NAMES[data.product] || data.productLabel;
-            const preset = data.presetTypeLabel === 'Amount' ? `Rs.${data.amount}` : `${data.volume}L`;
+            // `presetOverride` (set via the "Volume Preset" toggle on the
+            // billing page) always wins when present — it prints the fixed
+            // placeholder value on the Preset line while Sale/Volume/Rate
+            // below stay exactly what was actually entered/dispensed.
+            const preset = data.presetOverride || (data.presetTypeLabel === 'Amount' ? `Rs.${data.amount}` : `${data.volume}L`);
 
             const dt = data.billDateTimeIso ? new Date(data.billDateTimeIso) : new Date();
             const dateStr4 = `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`;
@@ -93,7 +97,7 @@
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}
                 ${line('Bill No', randomBillNo(dt))}
-                ${line('Trns.ID', data.transactionId)}
+                ${line('Trns.ID', '')}
                 ${line('Atnd.ID', '')}
                 ${line('Receipt', 'No Receipt')}
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}

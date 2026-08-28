@@ -15,7 +15,13 @@
 //     receiptNo, transactionId, billDateTimeIso, product, productLabel,
 //     density, presetTypeLabel, rate, volume, amount,
 //     dateStr, timeStr, printDateStr, printTimeStr,
-//     attendantUsername, vehicleNo, mobileNo
+//     attendantUsername, vehicleNo, mobileNo,
+//     presetOverride,                  // optional; when set (e.g. "999L"),
+//                                       // a template may print this in place
+//                                       // of its normally-computed Preset
+//                                       // value. Sale/Volume/Amount are never
+//                                       // affected — this only changes what's
+//                                       // shown on the Preset line.
 //   }
 //
 // FP ID / Nozzle No are NOT passed in `data` — every template generates

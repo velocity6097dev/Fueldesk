@@ -104,12 +104,6 @@ todaySummaryBtn.addEventListener('click', async () => {
     const profile = await FuelDeskAuth.requireSession('SUPER_ADMIN');
     if (!profile) return;
 
-    // Integrations is Super-Admin-only already (see requireSession
-    // above), and Super Admin is exempted from this block automatically
-    // — so this only ever fires in the (currently impossible) case that
-    // changes. Kept for consistency/future-proofing with every other page.
-    await checkSubscriptionBlock();
-
     whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
     await loadStatus();
     window.PageLoader?.ready();
