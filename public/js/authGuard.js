@@ -104,6 +104,14 @@ window.FuelDeskAuth = (function () {
 
         if (!(await checkSubscriptionAccess(profile))) return null;
 
+        // Start watching for hosting-status changes from here on, for as
+        // long as this page stays open — not just when we've already
+        // found the user blocked. Without this, a session that was fine
+        // at page-load time keeps working right through an admin marking
+        // it overdue a minute later; the page only ever noticed at the
+        // moment it loaded.
+        watchSubscriptionChanges(profile);
+
         return profile;
     }
 
@@ -111,6 +119,12 @@ window.FuelDeskAuth = (function () {
     // on the overdue blocker below.
     const DEVELOPER_WHATSAPP = '919875345863';
     const WHATSAPP_MESSAGE = 'plz verify the payment and resume my services';
+
+    function isOverdue(expiryDateStr) {
+        if (!expiryDateStr) return false;
+        const expiry = new Date(`${expiryDateStr}T23:59:59`);
+        return !isNaN(expiry.getTime()) && expiry < new Date();
+    }
 
     // Blocks ADMIN_STAFF / STATION_STAFF from using the app once hosting
     // is overdue (SUPER_ADMIN always passes through untouched, since they
@@ -122,17 +136,48 @@ window.FuelDeskAuth = (function () {
         if (profile.role === 'SUPER_ADMIN') return true;
 
         const { data, error } = await window.sb.from('daily_config').select('subscription_expiry_date').eq('id', 1).single();
-        if (error || !data || !data.subscription_expiry_date) return true;
-
-        const expiry = new Date(`${data.subscription_expiry_date}T23:59:59`);
-        if (isNaN(expiry.getTime()) || expiry >= new Date()) return true;
+        if (error || !data || !isOverdue(data.subscription_expiry_date)) return true;
 
         showSubscriptionBlocker();
         return false;
     }
 
+    // One realtime channel per page load, set up the moment we know the
+    // user is allowed in. Reacts both ways: blocks instantly (mid-session,
+    // no reload needed to notice) the moment an admin pushes an overdue
+    // date, and — if the blocker is already up — reloads the instant a
+    // future date restores access. SUPER_ADMIN never gets blocked, so
+    // never needs to watch for it.
+    let watching = false;
+    function watchSubscriptionChanges(profile) {
+        if (profile.role === 'SUPER_ADMIN' || watching) return;
+        watching = true;
+
+        window.sb
+            .channel('daily_config-subscription-watch')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
+                const expiryStr = payload.new?.subscription_expiry_date;
+                if (isOverdue(expiryStr)) {
+                    showSubscriptionBlocker();
+                } else if (document.querySelector('.subscription-blocker')) {
+                    window.location.reload();
+                }
+            })
+            .subscribe();
+    }
+
     function showSubscriptionBlocker() {
         if (document.querySelector('.subscription-blocker')) return; // already shown
+
+        // The full-page loader sits above everything else (z-index 999,
+        // vs. this overlay's 200) and is only ever dismissed by the calling
+        // page's own init() on the success path — which never runs once
+        // requireSession() returns null here. Left alone, the blocker would
+        // render immediately but stay hidden underneath the spinner until
+        // PageLoader's own 12-second safety-net timeout fires. Telling it
+        // to hide right now is what makes the block screen appear
+        // instantly on login instead of after that long wait.
+        window.PageLoader?.ready();
 
         const waText = encodeURIComponent(WHATSAPP_MESSAGE);
         const overlay = document.createElement('div');
@@ -160,22 +205,6 @@ window.FuelDeskAuth = (function () {
             localStorage.removeItem(LOGIN_AT_KEY);
             goToLogin();
         });
-
-        // Listens for a SUPER_ADMIN pushing a new (future) expiry date
-        // while this is on screen, and reloads automatically the moment
-        // access is restored — the blocked user doesn't have to know to
-        // refresh, it just unlocks.
-        window.sb
-            .channel('daily_config-subscription-unlock')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
-                const expiryStr = payload.new?.subscription_expiry_date;
-                if (!expiryStr) return;
-                const expiry = new Date(`${expiryStr}T23:59:59`);
-                if (!isNaN(expiry.getTime()) && expiry >= new Date()) {
-                    window.location.reload();
-                }
-            })
-            .subscribe();
     }
 
     function wireLogoutButtons() {
