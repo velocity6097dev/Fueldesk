@@ -32,10 +32,8 @@ const saveFormatBtn = document.getElementById('save-format-btn');
 
 document.getElementById('back-btn').addEventListener('click', () => window.location.href = '/admin.html');
 
-const templatePicker = makePickerField({
-    buttonEl: document.getElementById('template-picker-btn'),
-    labelEl: document.getElementById('template-picker-label'),
-    title: 'Preview With Template',
+const templatePicker = makeNativeSelectField({
+    selectEl: document.getElementById('template-picker-btn'),
     options: TEMPLATE_OPTIONS_FALLBACK,
     initialValue: 'BPCL_TOKHEIM',
 });
@@ -229,7 +227,7 @@ async function loadConfig() {
     if (!profile) return;
 
     const options = window.BillTemplates.list().map((t) => ({ value: t.id, label: t.label }));
-    TEMPLATE_OPTIONS_FALLBACK.push(...options);
+    templatePicker.setOptions(options);
 
     await loadConfig();
     window.PageLoader?.ready();

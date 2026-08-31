@@ -83,13 +83,30 @@ async function loadStaff() {
             btn.addEventListener('click', async (e) => {
                 const row = e.target.closest('.staff-item');
                 const isActive = e.target.dataset.active === 'true';
+                const name = row.querySelector('.staff-name')?.firstChild?.textContent?.trim() || 'this staff member';
+                const ok = await window.ConfirmDialog.show({
+                    title: isActive ? 'Deactivate Staff?' : 'Activate Staff?',
+                    message: isActive
+                        ? `${name} will immediately lose the ability to log in. You can reactivate them anytime.`
+                        : `${name} will be able to log in again.`,
+                    confirmLabel: isActive ? 'Deactivate' : 'Activate',
+                    danger: isActive,
+                });
+                if (!ok) return;
                 await updateStaff(row.dataset.id, { is_active: !isActive });
             });
         });
         staffListEl.querySelectorAll('.delete-staff-btn').forEach((btn) => {
             btn.addEventListener('click', async (e) => {
                 const row = e.target.closest('.staff-item');
-                if (!confirm('Permanently delete this staff account? This cannot be undone.')) return;
+                const name = row.querySelector('.staff-name')?.firstChild?.textContent?.trim() || 'this staff account';
+                const ok = await window.ConfirmDialog.show({
+                    title: 'Delete Staff Account?',
+                    message: `Permanently delete ${name}? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    danger: true,
+                });
+                if (!ok) return;
                 await deleteStaff(row.dataset.id);
             });
         });
@@ -168,10 +185,8 @@ addStaffBtn.addEventListener('click', async () => {
     whoami.textContent = `Logged in as ${FuelDeskAuth.displayName(profile)}`;
 
     const roleOptions = ROLE_OPTIONS_BY_RANK[profile.role] || ROLE_OPTIONS_BY_RANK.ADMIN_STAFF;
-    rolePicker = makePickerField({
-        buttonEl: document.getElementById('role-picker-btn'),
-        labelEl: document.getElementById('role-picker-label'),
-        title: 'Staff Role',
+    rolePicker = makeNativeSelectField({
+        selectEl: document.getElementById('role-picker-btn'),
         options: roleOptions,
         initialValue: 'STATION_STAFF',
     });

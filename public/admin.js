@@ -37,18 +37,14 @@ const saveConfigBtn = document.getElementById('save-config-btn');
 let currentLogoUrl = null;
 let currentConfig = null; // full loaded row — logo position/size/lock, etc. now live in Format, but Preview here needs to read them
 
-const templatePicker = makePickerField({
-    buttonEl: document.getElementById('template-picker-btn'),
-    labelEl: document.getElementById('template-picker-label'),
-    title: 'Receipt Template',
+const templatePicker = makeNativeSelectField({
+    selectEl: document.getElementById('template-picker-btn'),
     options: TEMPLATE_OPTIONS_FALLBACK,
     initialValue: 'BPCL_TOKHEIM',
 });
 
-const planPicker = makePickerField({
-    buttonEl: document.getElementById('plan-picker-btn'),
-    labelEl: document.getElementById('plan-picker-label'),
-    title: 'Hosting Plan',
+const planPicker = makeNativeSelectField({
+    selectEl: document.getElementById('plan-picker-btn'),
     options: PLAN_OPTIONS,
     initialValue: '1M',
 });
@@ -298,7 +294,7 @@ previewReceiptBtn.addEventListener('click', async () => {
     // The template picker was created with an empty option list (templates
     // register themselves as their <script> tags load); fill it in now.
     const options = window.BillTemplates.list().map((t) => ({ value: t.id, label: t.label }));
-    TEMPLATE_OPTIONS_FALLBACK.push(...options);
+    templatePicker.setOptions(options);
 
     FuelDeskAuth.renderPanelSwitcher('admin');
     await loadConfig(configPromise);

@@ -19,10 +19,10 @@
 } */
 
 :root {
-  --navy: #0B3556;
-  --navy-dark: #082741;
-  --amber: #C97A21;
-  --amber-dark: #A9640F;
+  --navy: #0A3577;
+  --navy-dark: #062350;
+  --amber: #E4572E;
+  --amber-dark: #C23F1D;
   --bg: #F5F6F4;
   --paper: #FFFFFF;
   --ink: #1F2A33;
@@ -31,7 +31,7 @@
   --line-soft: #E7EAED;
   --green: #2F7D5A;
   --green-bg: #E6F2EC;
-  --amber-bg: #FBEEDD;
+  --amber-bg: #FCE9E2;
   --red: #B23A34;
   --red-bg: #FBEAE9;
   --yellow: #D4A600;
@@ -77,9 +77,9 @@ svg { display: block; }
   white-space: nowrap;
 }
 .btn:active { transform: translateY(1px) scale(0.98); }
-.btn-primary { background: var(--amber); color: #fff; box-shadow: 0 4px 12px rgba(201,122,33,0.28); }
-.btn-primary:hover { background: var(--amber-dark); box-shadow: 0 6px 16px rgba(201,122,33,0.34); transform: translateY(-1px); }
-.btn-primary:active { box-shadow: 0 2px 6px rgba(201,122,33,0.24); transform: translateY(1px) scale(0.98); }
+.btn-primary { background: var(--amber); color: #fff; box-shadow: 0 4px 12px rgba(228,87,46,0.28); }
+.btn-primary:hover { background: var(--amber-dark); box-shadow: 0 6px 16px rgba(228,87,46,0.34); transform: translateY(-1px); }
+.btn-primary:active { box-shadow: 0 2px 6px rgba(228,87,46,0.24); transform: translateY(1px) scale(0.98); }
 .btn-secondary { background: var(--navy); color: #fff; }
 .btn-secondary:hover { background: var(--navy-dark); transform: translateY(-1px); }
 .btn-ghost { background: transparent; color: var(--navy); border-color: var(--line); }
@@ -125,11 +125,12 @@ svg { display: block; }
 /* ---------------- Fields ---------------- */
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink-soft); }
 .field span { font-weight: 600; letter-spacing: 0.01em; }
-.field input, .field textarea {
+.required-star { color: var(--red); margin-left: 2px; font-weight: 700; }
+.field input, .field textarea, .native-select {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 15.5px;
   color: var(--ink);
-  padding: 10px 11px;
+  padding: 13px 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--paper);
@@ -137,7 +138,22 @@ svg { display: block; }
   width: 100%;
 }
 .field textarea { resize: vertical; min-height: 56px; }
-.field input:focus, .field textarea:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
+.field input:focus, .field textarea:focus, .native-select:focus { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
+
+/* Native <select> (e.g. Billing Mode) — sized/bordered to match the rest
+   of the fields around it, but left with the browser's own dropdown
+   chrome/arrow/list rather than a custom-styled one. */
+.native-select { appearance: auto; -webkit-appearance: auto; cursor: pointer; }
+
+/* Removes the up/down spinner arrows on number inputs app-wide — fiddly
+   to tap accurately on a touch screen and inconsistent across browsers;
+   typing or the +/- the field already supports elsewhere is enough. */
+.field input[type="number"] { -moz-appearance: textfield; }
+.field input[type="number"]::-webkit-outer-spin-button,
+.field input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
 /* Live amount/volume preview shown under the entry field */
 .amount-preview-box {
@@ -180,12 +196,33 @@ svg { display: block; }
 /* A field that opens a bottom sheet instead of a native <select> */
 .picker-btn {
   display: flex; align-items: center; justify-content: space-between;
-  font-family: var(--font-body); font-size: 14px; color: var(--ink);
-  padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius);
+  font-family: var(--font-body); font-size: 15.5px; color: var(--ink);
+  padding: 13px 14px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--paper); width: 100%; text-align: left;
 }
 .picker-btn:hover { border-color: var(--amber); }
 .picker-btn .chev { width: 16px; height: 16px; color: var(--ink-soft); transform: rotate(90deg); flex-shrink: 0; }
+
+/* A field that opens the browser's OWN native dropdown list (a real
+   <select>) rather than the custom bottom-sheet popup above — but kept
+   visually identical to .picker-btn, including its chevron, so nothing
+   *looks* different. The select's own default arrow is turned off
+   (appearance:none) and the existing chevron svg is layered on top as
+   a non-interactive overlay so clicks still reach the select under it. */
+.select-wrap { position: relative; width: 100%; }
+.select-wrap .picker-select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  display: block;
+  font-family: var(--font-body); font-size: 15.5px; color: var(--ink);
+  padding: 13px 38px 13px 14px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--paper); width: 100%; text-align: left; cursor: pointer;
+}
+.select-wrap .picker-select:hover { border-color: var(--amber); }
+.select-wrap .picker-select:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
+.select-wrap .chev {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%) rotate(90deg);
+  width: 16px; height: 16px; color: var(--ink-soft); pointer-events: none;
+}
 
 /* ================= AUTH / RECOVERY / ONBOARD SCREENS ================= */
 .auth-screen {
@@ -197,7 +234,7 @@ svg { display: block; }
   padding-top: calc(24px + var(--safe-top));
   padding-bottom: calc(24px + var(--safe-bottom));
   background:
-    radial-gradient(circle at 15% 10%, rgba(201,122,33,0.10), transparent 45%),
+    radial-gradient(circle at 15% 10%, rgba(228,87,46,0.10), transparent 45%),
     radial-gradient(circle at 85% 90%, rgba(11,53,86,0.12), transparent 50%),
     var(--bg);
 }
@@ -223,6 +260,18 @@ svg { display: block; }
 }
 .brand-mark svg { width: 23px; height: 23px; }
 .brand h1 { font-size: 20px; letter-spacing: -0.01em; }
+
+/* Small round logo badge shown in the app topbar (billing/settings/staff/
+   format/integrations) next to the page title, for consistent branding
+   across every screen. White circle so the logo reads clearly against
+   the navy topbar background regardless of the logo's own colors. */
+.topbar-logo {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.topbar-logo img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
 .brand-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; }
 
 /* Login card: a soft entrance + a thin brand-gradient accent along the
@@ -305,7 +354,7 @@ svg { display: block; }
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 88% -20%, rgba(201,122,33,0.35), transparent 55%);
+  background: radial-gradient(circle at 88% -20%, rgba(228,87,46,0.35), transparent 55%);
   pointer-events: none;
 }
 /* A thin amber line along the bottom edge with a slow ambient sweep —
@@ -317,7 +366,7 @@ svg { display: block; }
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, var(--amber) 45%, #FFD873 50%, var(--amber) 55%, transparent);
+  background: linear-gradient(90deg, transparent, var(--amber) 45%, #FFB088 50%, var(--amber) 55%, transparent);
   background-size: 220% 100%;
   animation: topbar-line-sweep 7s ease-in-out infinite;
 }
@@ -461,7 +510,7 @@ svg { display: block; }
   width: 54px; height: 54px; border-radius: 50%;
   background: var(--amber); color: #fff; border: none;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 10px 24px rgba(201,122,33,0.4);
+  box-shadow: 0 10px 24px rgba(228,87,46,0.4);
   z-index: 25;
 }
 .fab svg { width: 24px; height: 24px; }
@@ -678,6 +727,11 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 /* ---------------- Extra button variant + small utilities ---------------- */
 .btn-success { background: var(--green); color: #fff; }
 .btn-success:hover { background: #256a4c; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { background: #a83226; }
+
+.confirm-actions { display: flex; gap: 10px; }
+.confirm-actions .btn { flex: 1; }
 
 .hint { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
 .loading-veil { text-align: center; padding: 24px 0; color: var(--ink-soft); font-size: 13px; }
@@ -762,11 +816,41 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
 .offline-card p { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 10px; }
 .offline-card .offline-status { font-weight: 700; color: var(--red); margin-bottom: 16px; }
 
-/* ---------------- Subscription/hosting renewal warning banner ---------------- */
+/* ---------------- Subscription/hosting renewal warning banner ----------------
+   Deliberately loud — this only shows up in the last 5 days before (or
+   after) the hosting subscription expires, so it needs to actually get
+   noticed rather than blend into the rest of the chrome. Sticky so it
+   stays visible while the page scrolls, with a pulsing icon and a
+   brighter "overdue" variant once the deadline has actually passed. */
 .subscription-banner {
-  background: linear-gradient(90deg, #92400e, #b45309);
-  color: #fff; font-size: 12.5px; font-weight: 700; text-align: center;
-  padding: 9px 14px; position: relative; z-index: 30;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  background: linear-gradient(90deg, #b45309, #d97706, #b45309);
+  background-size: 200% 100%;
+  color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.01em; text-align: center;
+  padding: 11px 16px;
+  position: sticky; top: 0; z-index: 40;
+  box-shadow: 0 3px 10px rgba(180,83,9,0.45), inset 0 -2px 0 rgba(0,0,0,0.12);
+  animation: subscription-banner-sheen 3.5s ease-in-out infinite;
+}
+.subscription-banner.overdue {
+  background: linear-gradient(90deg, #991b1b, #dc2626, #991b1b);
+  background-size: 200% 100%;
+  box-shadow: 0 3px 10px rgba(153,27,27,0.5), inset 0 -2px 0 rgba(0,0,0,0.15);
+}
+.subscription-banner .sub-banner-icon {
+  width: 17px; height: 17px; flex-shrink: 0;
+  animation: subscription-banner-pulse 1.4s ease-in-out infinite;
+}
+@keyframes subscription-banner-sheen {
+  0%, 100% { background-position: 0% 0; }
+  50% { background-position: 100% 0; }
+}
+@keyframes subscription-banner-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .subscription-banner, .subscription-banner .sub-banner-icon { animation: none; }
 }
 
 /* ---------------- App branding footer (web pages only, never the printed receipt) ---------------- */
@@ -779,7 +863,7 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   color: #fff; font-family: var(--font-display); font-size: 11.5px;
   font-weight: 700; letter-spacing: 0.3px; white-space: nowrap;
 }
-.app-footer-brand .bolt { color: var(--amber); font-size: 13px; line-height: 1; }
+.app-footer-brand .bolt { color: var(--red); font-size: 13px; line-height: 1; }
 
 /* ---------------- Small status tags (light bg, for lists) ---------------- */
 .tag {
@@ -978,6 +1062,21 @@ body.loader-active {
 body.asset-loader-active {
   overflow: hidden;
 }
+
+/* ---------------- Sync overlay (Sync button in the topbar) ----------------
+   Reuses the exact same .asset-preloader-mark/track/fill/status classes
+   above for visual consistency ("a progress bar like the loader screen")
+   — only the outer container is new, so the two stay visually identical
+   without duplicating the bar styling. */
+#sync-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
 .asset-preloader-mark {
   display: flex;
   flex-direction: column;
@@ -1057,3 +1156,4 @@ body.billing-page textarea {
   .asset-preloader-fill { transition: none; }
   .login-card { animation: none; }
 }
+

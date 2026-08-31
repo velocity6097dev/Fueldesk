@@ -48,6 +48,83 @@ window.ScrollLock = (function () {
     return { lock, unlock };
 })();
 
+// Custom confirm dialog — used in place of the browser's native
+// confirm()/alert() so account-affecting or irreversible actions (log
+// out, delete/deactivate staff) look and feel like the rest of the app
+// instead of a plain OS popup. Promise-based: resolves true only if the
+// person taps the confirm button, false for Cancel or tapping outside.
+//
+//   const ok = await window.ConfirmDialog.show({
+//     title: 'Log Out?',
+//     message: 'You will need to log in again to continue.',
+//     confirmLabel: 'Log Out',
+//     danger: true,
+//   });
+//   if (!ok) return;
+window.ConfirmDialog = (function () {
+    let modal = null;
+
+    function ensure() {
+        if (modal) return modal;
+        modal = document.createElement('div');
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-card">
+                <div class="sheet-title confirm-title" style="padding:0;"></div>
+                <div class="info-body confirm-message"></div>
+                <div class="confirm-actions">
+                    <button type="button" class="btn btn-ghost confirm-cancel-btn"></button>
+                    <button type="button" class="btn confirm-ok-btn"></button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    function close(node) {
+        node.classList.add('hidden');
+        window.ScrollLock.unlock();
+    }
+
+    function show({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+        const node = ensure();
+        node.querySelector('.confirm-title').textContent = title || '';
+        node.querySelector('.confirm-message').textContent = message || '';
+
+        const okBtn = node.querySelector('.confirm-ok-btn');
+        const cancelBtn = node.querySelector('.confirm-cancel-btn');
+        okBtn.textContent = confirmLabel;
+        okBtn.className = 'btn confirm-ok-btn ' + (danger ? 'btn-danger' : 'btn-primary');
+        cancelBtn.textContent = cancelLabel;
+
+        window.ScrollLock.lock();
+        node.classList.remove('hidden');
+
+        return new Promise((resolve) => {
+            function settle(result) {
+                cleanup();
+                close(node);
+                resolve(result);
+            }
+            function onBackdrop(e) { if (e.target === node) settle(false); }
+            function cleanup() {
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                node.removeEventListener('click', onBackdrop);
+            }
+            function onOk() { settle(true); }
+            function onCancel() { settle(false); }
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            node.addEventListener('click', onBackdrop);
+        });
+    }
+
+    return { show };
+})();
+
 window.Toast = (function () {
     let el = null;
     let hideTimer = null;
@@ -80,13 +157,35 @@ window.Toast = (function () {
 (function initOfflineWatcher() {
     let overlay = null;
 
+    // The service worker's own offline fallback (fetch -> catch -> cache
+    // match) only kicks in once it's actually controlling this page,
+    // which briefly isn't true right after the very first page load —
+    // there's a short window before install/activate/claim finish. If
+    // the person goes offline inside that window, an <img> pointed
+    // straight at /resources/bg.gif would fail outright (this is the
+    // "works after 1-2 times" symptom). Grabbing the bytes into memory
+    // up front sidesteps that timing entirely: once we have the blob,
+    // showing it later needs no network and no service worker at all.
+    let illustrationUrl = '/resources/bg.gif';
+    fetch('/resources/bg.gif')
+        .then((res) => (res.ok ? res.blob() : Promise.reject()))
+        .then((blob) => {
+            illustrationUrl = URL.createObjectURL(blob);
+            // Overlay may already exist if it was built before this
+            // resolved — patch its <img> in place rather than leaving
+            // it pointed at a network path that might be gone by now.
+            const img = overlay?.querySelector('.offline-illustration');
+            if (img) img.src = illustrationUrl;
+        })
+        .catch(() => {}); // stay on the network path; SW cache may still cover it
+
     function ensureOverlay() {
         if (overlay) return overlay;
         overlay = document.createElement('div');
         overlay.className = 'offline-overlay hidden';
         overlay.innerHTML = `
             <div class="offline-card">
-                <img src="/resources/bg.gif" alt="" class="offline-illustration">
+                <img src="${illustrationUrl}" alt="" class="offline-illustration">
                 <h2>You're Offline</h2>
                 <p>FuelDesk needs an internet connection to load rates and save bills. Reconnect, then try again.</p>
                 <p class="offline-status">Waiting for a connection...</p>
@@ -217,11 +316,20 @@ function renderSubscriptionBanner(expiryDateStr) {
     const daysLeft = Math.ceil((expiry - new Date()) / (24 * 60 * 60 * 1000));
     if (daysLeft > 5) return;
 
+    const isOverdue = daysLeft < 0;
     const banner = document.createElement('div');
-    banner.className = 'subscription-banner';
-    banner.textContent = daysLeft < 0
-        ? '⚠️ Hosting renewal is overdue — please confirm payment with the developer to keep the service running.'
-        : `⚠️ Hosting renewal due in ${daysLeft} day${daysLeft === 1 ? '' : 's'} — please confirm payment with the developer to renew.`;
+    banner.className = 'subscription-banner' + (isOverdue ? ' overdue' : '');
+    const message = isOverdue
+        ? 'Hosting renewal is overdue — please confirm payment with the developer to keep the service running.'
+        : `Hosting renewal due in ${daysLeft} day${daysLeft === 1 ? '' : 's'} — please confirm payment with the developer to renew.`;
+    banner.innerHTML = `
+        <svg class="sub-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span>${message}</span>
+    `;
     document.body.insertBefore(banner, document.body.firstChild);
 }
 // width (in cm). Call this before window.print() so @page picks it up.
@@ -332,6 +440,44 @@ function makePickerField({ buttonEl, labelEl, title, options, initialValue }) {
     };
 }
 
+// Wires a native <select> element — opens the browser/OS's own dropdown
+// list rather than a custom popup — and keeps it to the same { get, set }
+// shape as makePickerField above, so pages that used to read/write a
+// picker's value didn't need to change how they do that. Still fires a
+// 'picker-change' CustomEvent on the element itself when the value
+// changes, so any existing `elementEl.addEventListener('picker-change', ...)`
+// call sites keep working untouched.
+function makeNativeSelectField({ selectEl, options, initialValue }) {
+    function applyOptions(opts) {
+        selectEl.innerHTML = '';
+        opts.forEach((opt) => {
+            const optionEl = document.createElement('option');
+            optionEl.value = opt.value;
+            optionEl.textContent = opt.label;
+            selectEl.appendChild(optionEl);
+        });
+    }
+
+    if (options && options.length) applyOptions(options);
+    if (initialValue !== undefined) selectEl.value = initialValue;
+
+    selectEl.addEventListener('change', () => {
+        selectEl.dispatchEvent(new CustomEvent('picker-change', { detail: selectEl.value }));
+    });
+
+    return {
+        get: () => selectEl.value,
+        set: (v) => { selectEl.value = v; },
+        // Used by fields whose option list isn't known until data loads
+        // later (e.g. receipt templates, which register themselves as
+        // their own <script> tags run) — rebuilds the <option>s in place.
+        setOptions: (opts, selectedValue) => {
+            applyOptions(opts);
+            if (selectedValue !== undefined) selectEl.value = selectedValue;
+        },
+    };
+}
+
 // Adds a "lifted" shadow to the sticky top bar once the page has scrolled
 // underneath it (class toggled in CSS: .app-topbar.is-scrolled). rAF-
 // throttled so it costs nothing while idle. Pages without a topbar (e.g.
@@ -353,3 +499,16 @@ function makePickerField({ buttonEl, labelEl, title, options, initialValue }) {
     }, { passive: true });
     update(); // covers the case where the page is restored already scrolled
 })();
+
+// Stops the mouse wheel from changing a focused <input type="number">'s
+// value — the browser's default behavior on desktop, and an easy way to
+// accidentally change the amount/rate/density while just scrolling the
+// page. Blurring the field on wheel-over lets the page keep scrolling
+// normally instead of nudging the number up or down. Applies app-wide,
+// to every number input on every page, not just one specific field.
+document.addEventListener('wheel', () => {
+    const el = document.activeElement;
+    if (el && el.tagName === 'INPUT' && el.type === 'number') {
+        el.blur();
+    }
+}, { passive: true });

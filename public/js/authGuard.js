@@ -101,12 +101,93 @@ window.FuelDeskAuth = (function () {
         window.currentProfile = profile;
         window.currentSession = session;
         wireLogoutButtons();
+
+        if (!(await checkSubscriptionAccess(profile))) return null;
+
         return profile;
+    }
+
+    // Developer's WhatsApp number for the "renew hosting" contact button
+    // on the overdue blocker below.
+    const DEVELOPER_WHATSAPP = '919875345863';
+    const WHATSAPP_MESSAGE = 'plz verify the payment and resume my services';
+
+    // Blocks ADMIN_STAFF / STATION_STAFF from using the app once hosting
+    // is overdue (SUPER_ADMIN always passes through untouched, since they
+    // need access to fix it). Returns false and renders a full-screen,
+    // unclosable blocker if blocked; returns true otherwise. Fails OPEN
+    // (i.e. doesn't block) if the subscription row can't be read, so a
+    // transient network/query hiccup never locks staff out by accident.
+    async function checkSubscriptionAccess(profile) {
+        if (profile.role === 'SUPER_ADMIN') return true;
+
+        const { data, error } = await window.sb.from('daily_config').select('subscription_expiry_date').eq('id', 1).single();
+        if (error || !data || !data.subscription_expiry_date) return true;
+
+        const expiry = new Date(`${data.subscription_expiry_date}T23:59:59`);
+        if (isNaN(expiry.getTime()) || expiry >= new Date()) return true;
+
+        showSubscriptionBlocker();
+        return false;
+    }
+
+    function showSubscriptionBlocker() {
+        if (document.querySelector('.subscription-blocker')) return; // already shown
+
+        const waText = encodeURIComponent(WHATSAPP_MESSAGE);
+        const overlay = document.createElement('div');
+        // Same overlay/card classes as the "You're Offline" popup so this
+        // looks identical to it — dimmed backdrop, centered white card,
+        // same illustration sizing and text styling. "subscription-blocker"
+        // is just a hook for querying/URL — it doesn't carry its own look.
+        overlay.className = 'offline-overlay subscription-blocker';
+        overlay.innerHTML = `
+            <div class="offline-card">
+                <img src="/resources/505_Error.svg" alt="" class="offline-illustration" onerror="this.style.display='none';">
+                <h2>Service Stopped</h2>
+                <p>The service has stopped due to non-renewal of hosting. Kindly renew hosting by confirming payment to the developer below.</p>
+                <a class="btn btn-primary btn-block" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;" href="https://wa.me/${DEVELOPER_WHATSAPP}?text=${waText}" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;flex-shrink:0;"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.24-.46-2.37-1.47-.88-.78-1.47-1.75-1.64-2.05-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51-.17-.01-.37-.01-.57-.01s-.52.07-.8.37c-.27.3-1.04 1.02-1.04 2.5s1.07 2.9 1.22 3.1c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.62.71.23 1.36.2 1.87.12.57-.08 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35z"/><path d="M12.02 2C6.5 2 2.02 6.48 2.02 12c0 1.85.5 3.58 1.36 5.07L2 22l5.08-1.33A9.94 9.94 0 0 0 12.02 22C17.55 22 22 17.52 22 12S17.55 2 12.02 2zm0 18.15c-1.7 0-3.29-.47-4.65-1.28l-.33-.2-3.14.82.84-3.06-.21-.32a8.15 8.15 0 0 1-1.26-4.31c0-4.5 3.66-8.15 8.15-8.15A8.13 8.13 0 0 1 20.15 12c0 4.5-3.65 8.15-8.13 8.15z"/></svg>
+                    Contact on WhatsApp
+                </a>
+                <button type="button" class="btn btn-ghost btn-block" style="margin-top:10px;" id="subscription-blocker-logout-btn">Log Out</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        window.ScrollLock.lock();
+        document.getElementById('subscription-blocker-logout-btn').addEventListener('click', async () => {
+            await window.sb.auth.signOut();
+            localStorage.removeItem(LOGIN_AT_KEY);
+            goToLogin();
+        });
+
+        // Listens for a SUPER_ADMIN pushing a new (future) expiry date
+        // while this is on screen, and reloads automatically the moment
+        // access is restored — the blocked user doesn't have to know to
+        // refresh, it just unlocks.
+        window.sb
+            .channel('daily_config-subscription-unlock')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_config' }, (payload) => {
+                const expiryStr = payload.new?.subscription_expiry_date;
+                if (!expiryStr) return;
+                const expiry = new Date(`${expiryStr}T23:59:59`);
+                if (!isNaN(expiry.getTime()) && expiry >= new Date()) {
+                    window.location.reload();
+                }
+            })
+            .subscribe();
     }
 
     function wireLogoutButtons() {
         document.querySelectorAll('.logout-btn').forEach((btn) => {
             btn.addEventListener('click', async () => {
+                const ok = await window.ConfirmDialog.show({
+                    title: 'Log Out?',
+                    message: 'You will need to log in again to continue.',
+                    confirmLabel: 'Log Out',
+                    danger: true,
+                });
+                if (!ok) return;
                 await window.sb.auth.signOut();
                 localStorage.removeItem(LOGIN_AT_KEY);
                 window.location.replace('/login.html');

@@ -17,6 +17,53 @@
 window.FuelDeskSync = (function () {
     const MANIFEST_URL = '/api/asset-manifest';
     let running = false;
+    let overlay, fillEl, pctEl, labelEl;
+
+    // Reuses the exact .asset-preloader-* classes from style.css (already
+    // used by the first-run asset loader) so this looks like the same
+    // "real" loading screen, just triggered manually instead of on first
+    // visit. A dedicated #sync-overlay id keeps its own z-index/backdrop
+    // so it can't collide with that other loader if both ever somehow
+    // overlap.
+    function buildOverlay() {
+        if (overlay) return overlay;
+        overlay = document.createElement('div');
+        overlay.id = 'sync-overlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.innerHTML = `
+            <div class="asset-preloader-mark">
+                <span class="page-loader-word">FuelDesk</span>
+                <div class="asset-preloader-track"><div class="asset-preloader-fill"></div></div>
+                <div class="asset-preloader-status">
+                    <span class="asset-preloader-label">Preparing sync...</span>
+                    <span class="asset-preloader-pct">0%</span>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        document.body.setAttribute('aria-busy', 'true');
+        fillEl = overlay.querySelector('.asset-preloader-fill');
+        pctEl = overlay.querySelector('.asset-preloader-pct');
+        labelEl = overlay.querySelector('.asset-preloader-label');
+        window.ScrollLock.lock(); // blocks scrolling/interaction with everything underneath
+        return overlay;
+    }
+
+    function setProgress(fraction, text) {
+        const pct = Math.max(0, Math.min(100, Math.round(fraction * 100)));
+        if (fillEl) fillEl.style.width = pct + '%';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (text && labelEl) labelEl.textContent = text;
+    }
+
+    function removeOverlay() {
+        if (!overlay) return;
+        overlay.remove();
+        document.body.removeAttribute('aria-busy');
+        window.ScrollLock.unlock();
+        overlay = fillEl = pctEl = labelEl = null;
+    }
 
     async function refreshServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
@@ -32,7 +79,9 @@ window.FuelDeskSync = (function () {
     // straight from the network (bypassing both the browser's HTTP
     // cache and whatever's already in Cache Storage), then overwrites
     // the Cache Storage entry so offline mode also has the fresh copy.
-    async function refreshAllAssets() {
+    // Calls onProgress(done, total, currentUrl) after each file so the
+    // caller can drive a real (not fake/animated) progress bar.
+    async function refreshAllAssets(onProgress) {
         if (!('caches' in window)) return { total: 0, ok: 0 };
 
         const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
@@ -55,7 +104,9 @@ window.FuelDeskSync = (function () {
         const urls = Array.from(new Set([...manifest.assets.map((a) => a.url), ...corePaths]));
 
         let ok = 0;
-        for (const url of urls) {
+        for (let i = 0; i < urls.length; i++) {
+            const url = urls[i];
+            if (onProgress) onProgress(i, urls.length, url);
             try {
                 const fresh = await fetch(url, { cache: 'reload' }); // bypass HTTP cache too
                 if (fresh && fresh.ok) {
@@ -66,6 +117,7 @@ window.FuelDeskSync = (function () {
                 // Offline mid-sync, or a file genuinely isn't there — skip
                 // it and keep going rather than aborting the whole sync.
             }
+            if (onProgress) onProgress(i + 1, urls.length, url);
         }
 
         // Old version buckets are now safe to drop.
@@ -88,18 +140,27 @@ window.FuelDeskSync = (function () {
         if (buttonEl) buttonEl.disabled = true;
         if (iconEl) iconEl.classList.add('spin');
 
-        window.Toast?.show('Syncing styles, fonts & assets...', { duration: 8000 });
+        buildOverlay();
+        setProgress(0, 'Checking for updates...');
 
         try {
-            const [, assetResult] = await Promise.all([refreshServiceWorker(), refreshAllAssets()]);
-            window.Toast?.show(
-                assetResult.total ? `Synced ${assetResult.ok}/${assetResult.total} files — reloading...` : 'Synced — reloading...'
-            );
+            await refreshServiceWorker();
+            const assetResult = await refreshAllAssets((done, total, url) => {
+                const fileName = url ? url.split('/').pop() || url : '';
+                setProgress(total ? done / total : 0, total ? `Syncing ${fileName} (${done}/${total})` : 'Syncing...');
+            });
+            setProgress(1, assetResult.total ? `Synced ${assetResult.ok}/${assetResult.total} files` : 'Synced');
+            window.Toast?.show('Sync complete — reloading...');
+            // Deliberately leaves the overlay up (full bar, blocking
+            // everything) through this short delay and into the reload —
+            // that's the "don't allow anyone to touch anything until
+            // it's finished" behavior. The reload clears it for free.
             setTimeout(() => window.location.reload(), 500);
         } catch (err) {
             window.Toast?.show('Sync failed — check your connection and try again.', { error: true, duration: 5000 });
             if (buttonEl) buttonEl.disabled = false;
             if (iconEl) iconEl.classList.remove('spin');
+            removeOverlay();
             running = false;
         }
     }

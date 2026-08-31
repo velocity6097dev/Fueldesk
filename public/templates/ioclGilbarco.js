@@ -23,7 +23,7 @@
     // the global margin/line-height controls in the Format panel (those
     // apply uniformly around the whole receipt, not between these two
     // specific pieces).
-    const LOGO_TO_TEXT_GAP_MM = 4;
+    const LOGO_TO_TEXT_GAP_MM = 2;
 
     const FUEL_NAMES = { MS: 'PETROL', HSD: 'DIESEL', PREMIUM: 'PREMIUM' };
     const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -41,6 +41,14 @@
         const month = MONTH_ABBR[dt.getMonth()];
         const digits = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
         return `${month}-${digits}-ORGNL`;
+    }
+
+    // Same cosmetic, print-only idea as randomBillNo above -- not the real
+    // database transaction id, just a plausible-looking number so the
+    // field isn't left blank on the printed receipt.
+    function randomTransactionId() {
+        const last9 = String(Math.floor(Math.random() * 1000000000)).padStart(9, '0');
+        return `0000000${last9}`;
     }
 
     // FP ID / Nozzle No on THIS template are fixed per fuel type instead
@@ -97,7 +105,7 @@
                 ${s.address ? formattedBlock(s.address, `font-size:${TEXT_SCALE.addressPhone}em;`) : ''}
                 ${s.phone && s.phone.trim() ? `<div style="font-size:${TEXT_SCALE.addressPhone}em;">PH. ${escapeHtml(s.phone.trim())}</div>` : ''}
                 ${line('Bill No', randomBillNo(dt))}
-                ${line('Trns.ID', data.transactionId || '')}
+                ${line('Trns.ID', randomTransactionId())}
                 ${line('Atnd.ID', '')}
                 ${line('Receipt', 'No Receipt')}
                 ${line('Vehi.No', data.vehicleNo || 'Not Entered')}

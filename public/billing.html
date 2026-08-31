@@ -19,9 +19,12 @@
 
     <div class="app-screen">
         <div class="app-topbar">
-            <div class="topbar-text">
-                <strong>Fast Billing</strong>
-                <div class="topbar-sub" id="whoami">&nbsp;</div>
+            <div class="topbar-text" style="display:flex;align-items:center;gap:10px;">
+                <div class="topbar-logo"><img src="/resources/iocl-bill.png" alt="Indian Oil"></div>
+                <div>
+                    <strong>Fast Billing</strong>
+                    <div class="topbar-sub" id="whoami">&nbsp;</div>
+                </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
                 <button type="button" class="topbar-icon-btn" id="sync-btn" aria-label="Sync">
@@ -47,26 +50,30 @@
 
                 <div class="field">
                     <span>Product</span>
-                    <button type="button" class="picker-btn" id="product-picker-btn">
-                        <span id="product-picker-label"></span>
+                    <div class="select-wrap">
+                        <select id="product-picker-btn" class="picker-select"></select>
                         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
+                    </div>
                 </div>
 
                 <div class="field" style="margin-top:14px;">
                     <span>Billing Mode</span>
-                    <button type="button" class="picker-btn" id="mode-picker-btn">
-                        <span id="mode-picker-label"></span>
+                    <div class="select-wrap">
+                        <select id="mode-picker-btn" class="picker-select">
+                            <option value="VOLUME">By Volume (Liters)</option>
+                            <option value="AMOUNT">By Amount (₹)</option>
+                            <option value="VOLUME_PRESET">Volume Preset</option>
+                        </select>
                         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
+                    </div>
                 </div>
                 <div class="hint" id="volume-preset-hint" style="display:none;margin-top:6px;">
                     Enter the real volume dispensed below. The printed <b>Preset</b> line will show <b>999L</b> instead of that value — <b>Sale</b>, <b>Volume</b>, and everything else on the receipt still reflect exactly what you enter.
                 </div>
 
                 <label class="field" style="margin-top:14px;">
-                    <span id="input-value-label">Enter Volume (Liters)</span>
-                    <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00">
+                    <span class="field-label-row"><span id="input-value-label">Enter Volume (Liters)</span><span class="required-star" title="Required">*</span></span>
+                    <input type="number" id="input-value" inputmode="decimal" min="0" step="0.01" placeholder="0.00" required>
                 </label>
 
                 <div class="amount-preview-box" id="amount-preview-box">
@@ -95,16 +102,20 @@
 
                 <div class="field">
                     <span>Bill Time</span>
-                    <button type="button" class="picker-btn" id="time-mode-picker-btn">
-                        <span id="time-mode-picker-label"></span>
+                    <div class="select-wrap">
+                        <select id="time-mode-picker-btn" class="picker-select"></select>
                         <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                    </button>
+                    </div>
                 </div>
 
-                <label class="field" id="custom-time-inputs" style="display:none;margin-top:14px;">
+                <div class="field" id="custom-time-inputs" style="display:none;margin-top:14px;">
                     <span>Bill Date &amp; Time</span>
-                    <input type="datetime-local" id="custom-datetime">
-                </label>
+                    <div style="display:flex;gap:10px;">
+                        <input type="date" id="custom-date" style="flex:1.2;">
+                        <input type="time" id="custom-time" step="1" style="flex:1;">
+                    </div>
+                    <div class="hint" style="margin-top:2px;">Date and time open as two separate pickers so the time one always shows up.</div>
+                </div>
 
                 <label class="field" id="custom-rate-input" style="display:none;margin-top:14px;">
                     <span>Rate That Day (₹/L)</span>
@@ -114,9 +125,7 @@
             </div>
 
             <button type="button" id="print-btn" class="btn btn-primary btn-block" style="padding:15px;font-size:15.5px;">Print Bill</button>
-
-            <div class="app-footer-brand"><span class="bolt">❤️</span> Made by Velocity.logs</div>
-
+            <div class="app-footer-brand"><span class="bolt">&#10084;&#65039;</span> Made by Velocity.logs</div>
         </div>
     </div>
 

@@ -4,11 +4,9 @@ const PRODUCT_OPTIONS = [
     { value: 'HSD', label: 'Diesel (HSD)' },
     { value: 'PREMIUM', label: 'Premium' },
 ];
-const MODE_OPTIONS = [
-    { value: 'VOLUME', label: 'By Volume (Liters)' },
-    { value: 'AMOUNT', label: 'By Amount (₹)' },
-    { value: 'VOLUME_PRESET', label: 'Volume Preset' },
-];
+// Billing Mode's options now live directly in billing.html as <option>
+// elements (see mode-picker-btn) since it's a native <select>, not the
+// custom bottom-sheet picker the other fields use.
 const TIME_MODE_OPTIONS = [
     { value: 'CURRENT', label: 'Current Time' },
     { value: 'BACKDATE', label: 'Backdated (Custom)' },
@@ -23,7 +21,8 @@ const volumePresetHint = document.getElementById('volume-preset-hint');
 const vehicleNoInput = document.getElementById('vehicle-no');
 const mobileNoInput = document.getElementById('mobile-no');
 const customTimeInputs = document.getElementById('custom-time-inputs');
-const customDatetime = document.getElementById('custom-datetime');
+const customDateInput = document.getElementById('custom-date');
+const customTimeInput = document.getElementById('custom-time');
 const customRateField = document.getElementById('custom-rate-input');
 const backdateRateInput = document.getElementById('backdate-rate');
 const printBtn = document.getElementById('print-btn');
@@ -34,41 +33,43 @@ const roleBadge = document.getElementById('role-badge');
 
 let currentConfig = null;
 
-const productPicker = makePickerField({
-    buttonEl: document.getElementById('product-picker-btn'),
-    labelEl: document.getElementById('product-picker-label'),
-    title: 'Select Product',
+const productPicker = makeNativeSelectField({
+    selectEl: document.getElementById('product-picker-btn'),
     options: PRODUCT_OPTIONS,
     initialValue: 'HSD',
 });
 document.getElementById('product-picker-btn').addEventListener('picker-change', updateLiveStats);
 
-const modePicker = makePickerField({
-    buttonEl: document.getElementById('mode-picker-btn'),
-    labelEl: document.getElementById('mode-picker-label'),
-    title: 'Select Billing Mode',
-    options: MODE_OPTIONS,
-    initialValue: 'AMOUNT',
-});
-document.getElementById('mode-picker-btn').addEventListener('picker-change', () => {
+// Billing Mode is a plain native <select> (not the custom bottom-sheet
+// picker the other fields use) — kept to the same { get, set } shape as
+// makePickerField so the rest of this file didn't need to change.
+const modeSelectEl = document.getElementById('mode-picker-btn');
+modeSelectEl.value = 'AMOUNT'; // matches the previous picker's default
+const modePicker = {
+    get: () => modeSelectEl.value,
+    set: (v) => { modeSelectEl.value = v; },
+};
+modeSelectEl.addEventListener('change', () => {
     updateInputLabel();
     updateAmountPreview();
     volumePresetHint.style.display = modePicker.get() === 'VOLUME_PRESET' ? 'block' : 'none';
 });
 inputValue.addEventListener('input', updateAmountPreview);
 
-const timeModePicker = makePickerField({
-    buttonEl: document.getElementById('time-mode-picker-btn'),
-    labelEl: document.getElementById('time-mode-picker-label'),
-    title: 'Bill Timestamp',
+const timeModePicker = makeNativeSelectField({
+    selectEl: document.getElementById('time-mode-picker-btn'),
     options: TIME_MODE_OPTIONS,
     initialValue: 'CURRENT',
 });
 document.getElementById('time-mode-picker-btn').addEventListener('picker-change', (e) => {
     const isBackdate = e.detail === 'BACKDATE';
-    customTimeInputs.style.display = isBackdate ? 'flex' : 'none';
+    customTimeInputs.style.display = isBackdate ? 'block' : 'none';
     customRateField.style.display = isBackdate ? 'flex' : 'none';
-    if (isBackdate && !customDatetime.value) customDatetime.value = defaultDatetimeLocalValue();
+    if (isBackdate && !customDateInput.value) {
+        const { dateVal, timeVal } = defaultBackdateValues();
+        customDateInput.value = dateVal;
+        customTimeInput.value = timeVal;
+    }
     if (isBackdate && !backdateRateInput.value && currentConfig) {
         const { rateField } = fieldsForProduct(productPicker.get());
         backdateRateInput.value = Number(currentConfig[rateField]).toFixed(2);
@@ -173,10 +174,11 @@ function formatDateTime(d) {
     };
 }
 
-function defaultDatetimeLocalValue() {
+function defaultBackdateValues() {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // shift so toISOString() reads as local time
-    return d.toISOString().slice(0, 16);
+    const iso = d.toISOString(); // e.g. 2026-08-31T14:05:32.000Z (shifted to read as local)
+    return { dateVal: iso.slice(0, 10), timeVal: iso.slice(11, 19) };
 }
 
 function setPrintButtonLoading(isLoading) {
@@ -247,11 +249,11 @@ printBtn.addEventListener('click', async () => {
         billDateTime = new Date();
         rate = Number(currentConfig[rateField]);
     } else {
-        if (!customDatetime.value) {
+        if (!customDateInput.value || !customTimeInput.value) {
             Toast.show('Choose a backdated date & time.', { error: true });
             return;
         }
-        billDateTime = new Date(customDatetime.value);
+        billDateTime = new Date(`${customDateInput.value}T${customTimeInput.value}`);
         if (isNaN(billDateTime.getTime())) {
             Toast.show('That backdated date & time is not valid.', { error: true });
             return;
