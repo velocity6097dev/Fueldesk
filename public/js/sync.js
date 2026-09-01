@@ -97,6 +97,7 @@ window.FuelDeskSync = (function () {
         // css/js files every screen needs — same list sw.js precaches.
         const corePaths = [
             '/css/style.css',
+            '/css/receipt-print.css',
             '/js/ui.js', '/js/pageLoader.js', '/js/authGuard.js',
             '/js/supabaseClient.js', '/js/assetPreloader.js', '/js/sync.js',
             '/error.html', '/error.js',

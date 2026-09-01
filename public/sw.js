@@ -29,6 +29,7 @@ const MANIFEST_URL = '/api/asset-manifest';
 const PRECACHEABLE_PREFIXES = ['/fonts/', '/resources/'];
 const PRECACHEABLE_PATHS = [
     '/css/style.css',
+    '/css/receipt-print.css',
     '/js/ui.js',
     '/js/pageLoader.js',
     '/js/authGuard.js',

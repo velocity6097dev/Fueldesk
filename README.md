@@ -570,6 +570,7 @@ public/
   error.html / error.js     404 / offline / 500 / 402 — matches the app's own design system
   resources/bg.gif           Illustration used by error.html and the offline overlay
   css/style.css              Shared design tokens + components
+  css/receipt-print.css      Thermal receipt look + print mechanics (split out of style.css)
   js/supabaseClient.js       Builds the Supabase client, Remember Me storage adapter
   js/authGuard.js            Session + role check, 12h expiry, Billing/Settings switcher nav
   js/ui.js                   Toast, bottom-sheet picker, info popover, subscription banner, offline overlay, print helpers

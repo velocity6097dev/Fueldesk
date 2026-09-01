@@ -333,7 +333,7 @@ function renderSubscriptionBanner(expiryDateStr) {
     document.body.insertBefore(banner, document.body.firstChild);
 }
 // width (in cm). Call this before window.print() so @page picks it up.
-// Falls back to the 58mm default in style.css if never called.
+// Falls back to the 58mm default in receipt-print.css if never called.
 function applyReceiptWidth(widthCm) {
     const cm = Number(widthCm) || 5.8;
     let styleEl = document.getElementById('receipt-width-style');

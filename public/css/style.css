@@ -224,6 +224,51 @@ svg { display: block; }
   width: 16px; height: 16px; color: var(--ink-soft); pointer-events: none;
 }
 
+/* Backdated bill timestamp — date & time inputs (#custom-time-inputs on
+   billing.html). Two earlier versions of this tried to reskin the real
+   native <input type="date"/"time"> in place — first via the
+   ::-webkit-calendar-picker-indicator's background-image (silently
+   ignored by several Android builds, so the phone kept the browser's own
+   default icon while desktop looked fine), then by hiding that same
+   pseudo-element with opacity/position, then with display:none (some
+   Android builds only honour box-model properties like width/height on
+   this particular pseudo-element and ignore opacity/display entirely, so
+   its own glyph — a plain chevron on this device — kept rendering next
+   to our icon no matter which of those properties we set).
+   Given none of those properties are reliably honoured on this shadow-
+   internal pseudo-element across devices, this version stops trying to
+   restyle any *part* of the native control and instead hides the whole
+   thing: the real <input class="dt-native"> is stretched over the full
+   field and made fully transparent (opacity on a normal top-level
+   element is universally respected, unlike opacity on a native control's
+   internal sub-part), so tapping/typing anywhere still hits the real
+   input and opens the OS picker exactly as before — it's just invisible.
+   Sitting behind it, .dt-display is a plain themed div (not a form
+   control at all) that shows the current value as text plus our SVG
+   icon; nothing about its rendering is native-control behaviour, so it
+   looks identical on every browser and OS. billing.js keeps its text in
+   sync with the real input's value on every change (see
+   syncDateTimeDisplays()). */
+.dt-field { position: relative; }
+.dt-field .dt-native {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; border: 0; background: none;
+  opacity: 0; cursor: pointer; z-index: 1;
+}
+.dt-field .dt-display {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; padding: 13px 14px;
+  font-family: var(--font-body); font-size: 15.5px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--paper);
+}
+.dt-field .dt-native:focus + .dt-display {
+  border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg);
+}
+.dt-field .dt-icon {
+  width: 19px; height: 19px; color: var(--navy);
+  opacity: 0.85; flex-shrink: 0;
+}
 /* ================= AUTH / RECOVERY / ONBOARD SCREENS ================= */
 .auth-screen {
   min-height: 100vh;
@@ -921,70 +966,11 @@ table.excel-table tbody tr.row-empty { color: var(--ink-soft); font-style: itali
   width: 44px; text-align: right; flex-shrink: 0;
 }
 
-/* ---------------- Thermal receipt content styles ----------------
-   These apply any time #thermal-receipt is visible — both the live
-   preview on the Format page AND the moment it's actually printed —
-   so what you see in the live editor is what comes out of the printer.
-   Only the print-specific mechanics below are wrapped in @media print. */
-#thermal-receipt {
-  background: #fff; color: #000; padding: 0;
-  font-family: var(--font-mono); font-size: 11px; 
-  line-height: 1.2;font-weight: 500; letter-spacing: 0.11px; -webkit-text-stroke: 0.05px #000;
-}
-#thermal-receipt .text-center { text-align: center; }
-#thermal-receipt .text-right { text-align: right; }
-#thermal-receipt .text-left { text-align: left; }
-#thermal-receipt .font-bold { font-weight: bold; }
-#thermal-receipt .uppercase { text-transform: uppercase; }
-#thermal-receipt .receipt-logo-box { display: inline-block; vertical-align: top; border: 1px solid #000; padding: 4px; width: 90px; font-size: 10px; line-height: 1; }
-#thermal-receipt .receipt-logo-img { display: inline-block; vertical-align: top; max-width: 100%; height: auto; }
-
-/* "Classic" dot-matrix style: label column + colon + value, aligned by
-   a fixed-width label instead of manually padding with spaces. */
-#thermal-receipt .classic-line { display: flex; margin-bottom: 1px; font-weight: 500; letter-spacing: 0.11px;}
-#thermal-receipt .classic-label { display: inline-block; width: 54px; flex-shrink: 0; }
-#thermal-receipt .classic-circle-logo {
-    width: 70px; height: 70px; border-radius: 50%; border: 2px solid #000;
-    display: inline-flex; vertical-align: top; align-items: center; justify-content: center; position: relative;
-}
-#thermal-receipt .classic-circle-logo::before {
-    content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 1px solid #000;
-}
-#thermal-receipt .classic-circle-logo span { font-size: 9px; font-weight: bold; text-align: center; line-height: 1.1; }
-#thermal-receipt .grid-3-col { display: grid; grid-template-columns: 90px 10px 1fr; row-gap: 2px; }
-#thermal-receipt .grid-tax { display: grid; grid-template-columns: 105px 10px 1fr; row-gap: 2px; font-size: 10px; }
-#thermal-receipt .flex-between { display: flex; justify-content: space-between; margin-bottom: 2px; }
-#thermal-receipt .my-2 { margin-top: 8px; margin-bottom: 8px; }
-#thermal-receipt .my-3 { margin-top: 12px; margin-bottom: 12px; }
-
-/* ---------------- Hidden-until-print (billing.html / admin.html use this) ---------------- */
-#thermal-receipt.print-only { display: none; }
-
-@media print {
-  body * { visibility: hidden !important; }
-  body { background: #fff !important; }
-  @page { margin: 0; size: 58mm auto; } /* overridden per-print by applyReceiptWidth() in ui.js */
-
-  /* Elements like .app-screen (min-height:100vh) and html/body
-     (height:100%) still reserve their full layout height even while
-     hidden, which can push the page height past a single sheet and
-     print a blank second page. Collapse them during print. */
-  html, body { height: auto !important; min-height: 0 !important; }
-  .app-screen { min-height: 0 !important; height: auto !important; }
-
-  #thermal-receipt.print-only, #thermal-receipt.print-only * { visibility: visible !important; }
-  #thermal-receipt.print-only {
-    display: block !important; position: absolute; left: 0; top: 0; width: 58mm;
-    page-break-after: avoid; page-break-inside: avoid;
-  }
-}
-
-/* ---------------- On-screen "paper" presentation (Format page live preview) ---------------- */
-.receipt-paper {
-  margin: 0 auto; box-shadow: 0 6px 24px rgba(11,53,86,0.18);
-  border: 1px solid var(--line); border-radius: 2px; overflow: hidden;
-  transition: width 0.15s ease;
-}
+/* ---------------- Thermal receipt + printing ----------------
+   Moved to /css/receipt-print.css (kept separate on purpose so the
+   receipt layout and print mechanics can be maintained on their own).
+   That file is loaded right after this one on billing.html, admin.html
+   and format.html — the three screens that render #thermal-receipt. */
 
 /*----------popup lock -----------*/
 body.scroll-locked {

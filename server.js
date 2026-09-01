@@ -98,6 +98,7 @@ function listPublicDir(relDir, labelPrefix) {
 // which are meant to grow without touching this file.
 const APP_SHELL_ASSETS = [
     { url: '/css/style.css', label: 'Stylesheet' },
+    { url: '/css/receipt-print.css', label: 'Stylesheet — Receipt & print' },
     { url: '/js/ui.js', label: 'App core' },
     { url: '/js/pageLoader.js', label: 'App core' },
     { url: '/js/authGuard.js', label: 'App core' },

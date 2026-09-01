@@ -23,6 +23,8 @@ const mobileNoInput = document.getElementById('mobile-no');
 const customTimeInputs = document.getElementById('custom-time-inputs');
 const customDateInput = document.getElementById('custom-date');
 const customTimeInput = document.getElementById('custom-time');
+const customDateDisplay = document.getElementById('custom-date-display');
+const customTimeDisplay = document.getElementById('custom-time-display');
 const customRateField = document.getElementById('custom-rate-input');
 const backdateRateInput = document.getElementById('backdate-rate');
 const printBtn = document.getElementById('print-btn');
@@ -70,6 +72,9 @@ document.getElementById('time-mode-picker-btn').addEventListener('picker-change'
         customDateInput.value = dateVal;
         customTimeInput.value = timeVal;
     }
+    // Covers both branches above: a value set just now, and one already
+    // sitting in the input from a browser back/forward-cache restore.
+    if (isBackdate) syncDateTimeDisplays();
     if (isBackdate && !backdateRateInput.value && currentConfig) {
         const { rateField } = fieldsForProduct(productPicker.get());
         backdateRateInput.value = Number(currentConfig[rateField]).toFixed(2);
@@ -180,6 +185,24 @@ function defaultBackdateValues() {
     const iso = d.toISOString(); // e.g. 2026-08-31T14:05:32.000Z (shifted to read as local)
     return { dateVal: iso.slice(0, 10), timeVal: iso.slice(11, 19) };
 }
+
+// The real date/time <input>s are made fully invisible (see .dt-native in
+// style.css) so the OS's own picker-trigger icon — which can't be reskinned
+// consistently across phones — never has a chance to render. .dt-display
+// underneath is a plain div that shows the current value instead, so it
+// needs to be told about every change by hand rather than relying on the
+// browser to paint it.
+function isoDateToDisplay(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+function syncDateTimeDisplays() {
+    customDateDisplay.textContent = isoDateToDisplay(customDateInput.value);
+    customTimeDisplay.textContent = customTimeInput.value || '';
+}
+customDateInput.addEventListener('input', syncDateTimeDisplays);
+customTimeInput.addEventListener('input', syncDateTimeDisplays);
 
 function setPrintButtonLoading(isLoading) {
     printBtn.disabled = isLoading;
